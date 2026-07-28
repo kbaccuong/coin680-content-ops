@@ -210,8 +210,13 @@ trị thật trong file này — hỏi lại người dùng nếu cần dùng �
 3. Decode base64 → lưu file `.png` local (`[Convert]::FromBase64String` → `WriteAllBytes`).
 4. Vì REST API `/wp/v2/media` chưa được test có bị WAF chặn giống nội dung bài dài hay không
    (rủi ro tương tự Phần 11), **dùng cùng đường SSH/WP-CLI đã dùng cho bài viết**: `scp` file ảnh
-   lên server, sau đó `wp media import <remote-file> --post_id=<id> --title="..." --alt-text="..."`
-   để upload vào Media Library **và** gán luôn làm Featured Image của bài (`--post_id`).
+   lên server, sau đó `wp media import <remote-file> --post_id=<id> --title="..." --alt="..."
+   --featured_image` để upload vào Media Library **và** gán làm Featured Image của bài. **Lưu ý
+   (phát hiện 2026-07-28):** flag đúng là `--alt` (không phải `--alt-text` — sai sẽ báo "unknown
+   parameter" và toàn bộ lệnh import KHÔNG chạy); và `--post_id` một mình **không** tự set featured
+   image, bắt buộc phải thêm `--featured_image` hoặc set tay sau đó bằng
+   `wp post meta update <post_id> _thumbnail_id <attachment_id>`. Luôn `wp post meta get <post_id>
+   _thumbnail_id` lại để xác nhận trước khi coi là xong, đừng suy luận từ "lệnh không báo lỗi."
 5. Ảnh minh hoạ trong bài (1-2 ảnh): làm tương tự, upload rồi lấy URL trả về
    (`wp media import ... --porcelain` trả về attachment ID, dùng `wp post get <id> --field=guid`
    hoặc `wp media list` để lấy URL) chèn vào đúng vị trí HTML bằng thẻ `<img>` có `alt` mô tả đầy đủ.
