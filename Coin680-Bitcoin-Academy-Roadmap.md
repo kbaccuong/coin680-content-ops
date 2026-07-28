@@ -83,6 +83,12 @@ mỗi nhóm (không đổi):
 
 - **BTA-041–080 (How It Works):** blockchain kỹ thuật, mining, hash rate, node, consensus
   (Proof of Work), block reward, mempool, block time, difficulty adjustment, Lightning Network.
+
+### Nhóm 2 — tiêu đề đã soạn (viết tới đâu, soạn tiếp tới đó)
+
+| ID | Tiêu đề | Ghi chú |
+|---|---|---|
+| BTA-041 | What Is Bitcoin Mining? A Complete Explanation | Category: How It Works (id 9) + Bitcoin Academy (id 7) |
 - **BTA-081–120 (History & Cycles):** dòng thời gian Bitcoin theo năm, các đợt halving, chu kỳ
   bull/bear, các mốc giá lịch sử, sự kiện lớn (sàn sập, ETF duyệt...).
 - **BTA-121–160 (Wallets & Security):** hot vs cold wallet, hardware wallet, seed phrase, custodial
