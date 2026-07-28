@@ -4,9 +4,9 @@
 với thứ tự cố định trong `Coin680-Bitcoin-Academy-Roadmap.md` / `Coin680-Exchange-Hub-Roadmap.md`.
 Cập nhật file này mỗi khi xuất bản bài mới.
 
-**Kiểm tra lần cuối:** 2026-07-28, qua SSH/WP-CLI (`wp post list`), post ID 71-154.
+**Kiểm tra lần cuối:** 2026-07-28, qua SSH/WP-CLI (`wp post list`), post ID 71-174.
 
-## ➡️ BÀI CẦN VIẾT TIẾP THEO: **BTA-022** (đã có chi tiết đầy đủ trong `Coin680-Bitcoin-Academy-Roadmap.md` Nhóm 1, tới tận BTA-040 — không cần soạn thêm gì trước khi viết tiếp)
+## ➡️ BÀI CẦN VIẾT TIẾP THEO: **BTA-032** (đã có chi tiết đầy đủ trong `Coin680-Bitcoin-Academy-Roadmap.md` Nhóm 1, tới tận BTA-040 — không cần soạn thêm gì trước khi viết tiếp)
 
 ## Bảng trạng thái BTA-001 → BTA-040 (Nhóm 1: Fundamentals)
 
@@ -33,9 +33,19 @@ Cập nhật file này mỗi khi xuất bản bài mới.
 | BTA-019 | Can Bitcoin Transactions Be Reversed? | ✅ Hẹn giờ | Post ID 150, 14:30 UTC (21:30 VN) 29/7 |
 | BTA-020 | Is Bitcoin Anonymous? Understanding Bitcoin Privacy | ✅ Hẹn giờ | Post ID 152, 15:30 UTC (22:30 VN) 29/7 |
 | BTA-021 | What Is Bitcoin Used For? | ✅ Hẹn giờ | Post ID 154, 16:30 UTC (23:30 VN) 29/7 |
-| **BTA-022** | Can You Buy Things With Bitcoin? | ❌ **Chưa viết** | **← Viết tiếp theo** — xem `Coin680-Bitcoin-Academy-Roadmap.md` dòng BTA-022, tiêu đề đã có sẵn |
+| BTA-022 | Can You Buy Things With Bitcoin? | ✅ Hẹn giờ | Post ID 156, 2026-07-30 07:30 UTC (14:30 VN) |
+| BTA-023 | What Is a Satoshi? Understanding Bitcoin's Smallest Unit | ✅ Hẹn giờ | Post ID 158, 08:30 UTC (15:30 VN) 30/7 |
+| BTA-024 | How Divisible Is Bitcoin? | ✅ Hẹn giờ | Post ID 160, 09:30 UTC (16:30 VN) 30/7 |
+| BTA-025 | What Is the Bitcoin Network? | ✅ Hẹn giờ | Post ID 162, 10:30 UTC (17:30 VN) 30/7 |
+| BTA-026 | Who Uses Bitcoin? Understanding Bitcoin's User Base | ✅ Hẹn giờ | Post ID 164, 11:30 UTC (18:30 VN) 30/7 |
+| BTA-027 | Why Do People Buy Bitcoin? | ✅ Hẹn giờ | Post ID 166, 12:30 UTC (19:30 VN) 30/7 |
+| BTA-028 | What Are the Risks of Bitcoin? | ✅ Hẹn giờ | Post ID 168, 13:30 UTC (20:30 VN) 30/7 |
+| BTA-029 | Is Bitcoin a Good Investment? An Honest Overview | ✅ Hẹn giờ | Post ID 170, 14:30 UTC (21:30 VN) 30/7 |
+| BTA-030 | Bitcoin Myths and Misconceptions Explained | ✅ Hẹn giờ | Post ID 172, 15:30 UTC (22:30 VN) 30/7 |
+| BTA-031 | What Is Bitcoin Dominance? | ✅ Hẹn giờ | Post ID 174, 16:30 UTC (23:30 VN) 30/7 |
+| **BTA-032** | What Is the Bitcoin Whitepaper? | ❌ **Chưa viết** | **← Viết tiếp theo** — tiêu đề đã có sẵn trong roadmap |
 
-Tất cả CTA "Continue Learning" của BTA-002→021 trỏ về `/category/bitcoin-academy/` (chưa trỏ thẳng
+Tất cả CTA "Continue Learning" của BTA-002→031 trỏ về `/category/bitcoin-academy/` (chưa trỏ thẳng
 bài kế tiếp vì cả loạt được đăng theo batch, không có thứ tự "đã tồn tại trước" rõ ràng giữa
 chúng — có thể cập nhật lại sau nếu muốn liên kết tuần tự chặt hơn).
 
