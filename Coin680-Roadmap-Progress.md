@@ -4,9 +4,9 @@
 với thứ tự cố định trong `Coin680-Bitcoin-Academy-Roadmap.md` / `Coin680-Exchange-Hub-Roadmap.md`.
 Cập nhật file này mỗi khi xuất bản bài mới.
 
-**Kiểm tra lần cuối:** 2026-07-28, qua SSH/WP-CLI (`wp post list`), post ID 71-113.
+**Kiểm tra lần cuối:** 2026-07-28, qua SSH/WP-CLI (`wp post list`), post ID 71-154.
 
-## ➡️ BÀI CẦN VIẾT TIẾP THEO: **BTA-012** (xem `Coin680-Bitcoin-Academy-Roadmap.md` Nhóm 2)
+## ➡️ BÀI CẦN VIẾT TIẾP THEO: **BTA-022** (đã có chi tiết đầy đủ trong `Coin680-Bitcoin-Academy-Roadmap.md` Nhóm 1, tới tận BTA-040 — không cần soạn thêm gì trước khi viết tiếp)
 
 ## Bảng trạng thái BTA-001 → BTA-040 (Nhóm 1: Fundamentals)
 
@@ -22,12 +22,22 @@ Cập nhật file này mỗi khi xuất bản bài mới.
 | BTA-008 | What Is Cryptocurrency? Understanding the Basics | ✅ Hẹn giờ | Post ID 107, slug `what-is-cryptocurrency`, 13:30 UTC (20:30 VN) |
 | BTA-009 | What Makes Bitcoin Valuable? | ✅ Hẹn giờ | Post ID 109, slug `what-makes-bitcoin-valuable`, 14:30 UTC (21:30 VN) |
 | BTA-010 | How Many Bitcoins Are There? Understanding Bitcoin's Supply | ✅ Hẹn giờ | Post ID 111, slug `how-many-bitcoins-are-there`, 15:30 UTC (22:30 VN) |
-| BTA-011 | What Is Bitcoin's 21 Million Coin Limit? | ✅ Hẹn giờ | Post ID 113, slug `bitcoin-21-million-coin-limit`, 16:30 UTC (23:30 VN) |
-| **BTA-012** | (xem Roadmap Nhóm 2: How It Works, BTA-041–080 chưa chi tiết — cần soạn chi tiết BTA-012–040 trước khi viết tiếp) | ❌ **Chưa viết** | **← Việc tiếp theo: chi tiết hoá tiêu đề BTA-012→040 trong Roadmap trước khi viết** |
+| BTA-011 | What Is Bitcoin's 21 Million Coin Limit? | ✅ Hẹn giờ | Post ID 113, 2026-07-28 16:30 UTC (23:30 VN) |
+| BTA-012 | Why Is Bitcoin Called Digital Gold? | ✅ Hẹn giờ | Post ID 136, slug `why-is-bitcoin-called-digital-gold`, 2026-07-29 07:30 UTC (14:30 VN) |
+| BTA-013 | What Is Decentralization in Bitcoin? | ✅ Hẹn giờ | Post ID 138, 08:30 UTC (15:30 VN) 29/7 |
+| BTA-014 | Who Controls Bitcoin? Understanding Bitcoin Governance | ✅ Hẹn giờ | Post ID 140, 09:30 UTC (16:30 VN) 29/7 |
+| BTA-015 | What Is a Bitcoin Address? | ✅ Hẹn giờ | Post ID 142, 10:30 UTC (17:30 VN) 29/7 |
+| BTA-016 | What Is a Bitcoin Transaction? How It Works | ✅ Hẹn giờ | Post ID 144, 11:30 UTC (18:30 VN) 29/7 |
+| BTA-017 | How Long Does a Bitcoin Transaction Take? | ✅ Hẹn giờ | Post ID 146, 12:30 UTC (19:30 VN) 29/7 |
+| BTA-018 | What Are Bitcoin Transaction Fees? | ✅ Hẹn giờ | Post ID 148, 13:30 UTC (20:30 VN) 29/7 |
+| BTA-019 | Can Bitcoin Transactions Be Reversed? | ✅ Hẹn giờ | Post ID 150, 14:30 UTC (21:30 VN) 29/7 |
+| BTA-020 | Is Bitcoin Anonymous? Understanding Bitcoin Privacy | ✅ Hẹn giờ | Post ID 152, 15:30 UTC (22:30 VN) 29/7 |
+| BTA-021 | What Is Bitcoin Used For? | ✅ Hẹn giờ | Post ID 154, 16:30 UTC (23:30 VN) 29/7 |
+| **BTA-022** | Can You Buy Things With Bitcoin? | ❌ **Chưa viết** | **← Viết tiếp theo** — xem `Coin680-Bitcoin-Academy-Roadmap.md` dòng BTA-022, tiêu đề đã có sẵn |
 
-Tất cả BTA-002→011 dùng CTA "Continue Learning" trỏ về `/category/bitcoin-academy/` (chưa trỏ
-thẳng bài kế tiếp vì cả loạt được đăng cùng lúc trong 1 batch, không có thứ tự "đã tồn tại trước"
-rõ ràng giữa chúng — có thể cập nhật lại sau nếu muốn liên kết tuần tự chặt hơn).
+Tất cả CTA "Continue Learning" của BTA-002→021 trỏ về `/category/bitcoin-academy/` (chưa trỏ thẳng
+bài kế tiếp vì cả loạt được đăng theo batch, không có thứ tự "đã tồn tại trước" rõ ràng giữa
+chúng — có thể cập nhật lại sau nếu muốn liên kết tuần tự chặt hơn).
 
 ## Crypto Market News — đã đăng 2026-07-27 và 2026-07-28
 
