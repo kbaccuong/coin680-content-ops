@@ -252,8 +252,10 @@ giữ nguyên vai trò như FXM680.
 Xem chi tiết đầy đủ trong **`Coin680-Exchange-Hub-Roadmap.md`** (18 bài Exchange Comparison Hub +
 6 Exchange Hub × 12 bài: Binance, Bybit, OKX, BingX, Gate, MEXC). Tóm tắt quy tắc:
 
-- **CÓ affiliate**, dùng đúng link ref/affiliate thật của từng sàn (bảng dưới — hiện còn placeholder,
-  cần bạn cung cấp link thật khi viết tới hub đó).
+- **CÓ affiliate**, dùng đúng Pretty Link (`coin680.com/<slug>`) của từng sàn — **không** dán thẳng
+  link ref gốc dài trong bài, luôn dùng link rút gọn qua Pretty Links plugin (xem bảng dưới), đúng
+  cách FXM680 đã làm. Nếu cần sửa link đích sau này, chỉ sửa 1 chỗ trong Pretty Links, không phải
+  sửa lại từng bài đã đăng.
 - Bài MOFU: `tiny-cta-category` hoặc `tiny-product-best` — khách quan.
 - Bài BOFU: `tiny-cta-multi` hoặc `tiny-cross-sell` — CTA rõ ("Open Account", "Claim Bonus").
 - Áp dụng nguyên tắc 3 điểm chạm CTA (giống FXM680 Phần 10.7): CTA1 (~20% đầu, khơi vấn đề) →
@@ -261,20 +263,25 @@ Xem chi tiết đầy đủ trong **`Coin680-Exchange-Hub-Roadmap.md`** (18 bài
 - Luôn link ngược 1-2 bài Bitcoin Academy liên quan + link chéo Exchange Comparison Hub.
 - Tuân thủ Tone cấm dù có affiliate. Không cam kết lợi nhuận từ trading trên sàn.
 
-**Bảng affiliate link (CẦN BẠN CUNG CẤP):**
+**Bảng affiliate link — đã cấu hình qua Pretty Links plugin (xác nhận 2026-07-28):**
 
-| Sàn | Link affiliate dùng trong bài |
-|---|---|
-| Binance | *(chưa có — cần link ref thật)* |
-| Bybit | *(chưa có — cần link ref thật)* |
-| OKX | *(chưa có — cần link ref thật)* |
-| BingX | *(chưa có — cần link ref thật)* |
-| Gate | *(chưa có — cần link ref thật)* |
-| MEXC | *(chưa có — cần link ref thật)* |
+| Sàn | Link dùng trong bài (Pretty Link) | Trạng thái |
+|---|---|---|
+| Binance | `https://coin680.com/Binance` | ✅ Đã có |
+| Bybit | *(chưa cấu hình trong Pretty Links — cần bạn thêm)* | ❌ Thiếu |
+| OKX | `https://coin680.com/okx` | ✅ Đã có |
+| BingX | `https://coin680.com/bingx` | ✅ Đã có |
+| Gate | `https://coin680.com/Gate` | ✅ Đã có |
+| MEXC | `https://coin680.com/Mexc` | ✅ Đã có |
 
-**Danh mục WordPress (TBD):** giống FXM680 Phần 10.5, cần tạo category "Bitcoin Academy",
-"Exchange Comparison", "Exchange Reviews" (cha) + 6 category con (Binance, Bybit, OKX, BingX,
-Gate, MEXC), "Crypto Market News". Điền ID thật vào bảng này sau khi tạo trên WordPress mới.
+Mọi bài Exchange Hub viết từ nay dùng đúng các Pretty Link ở trên làm href cho nút CTA
+("Open Account"/"Claim Bonus"), không dùng link ref gốc trực tiếp. **Riêng Bybit vẫn thiếu** —
+khi viết tới Bybit Hub cần bạn bổ sung link trong Pretty Links trước.
+
+**Danh mục WordPress (đã tạo, xác nhận 2026-07-27):** Crypto Market News = 2 (con: Bitcoin News=3,
+Market & Analysis=4, Business & Institutions=5, Regulation & Policy=6), Bitcoin Academy = 7
+(Fundamentals=8, ...), Exchange Comparison = 18, Exchange Reviews = 19 (con: Binance=20, Bybit=21,
+OKX=22, BingX=23, Gate=24, MEXC=25).
 
 ---
 
