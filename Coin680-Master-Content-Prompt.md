@@ -173,9 +173,20 @@ licensed financial advisor before making any investment decisions."
 
 ### 5.4. JSON-LD Schema
 
-Academy/Exchange Hub: dùng đúng khung `Article`/`BlogPosting` + `FAQPage` như FXM680, đổi
-`author`/`publisher.name` → "Coin680", `url` → `https://coin680.com/`, `logo.url` → LOGO URL
-thật khi có.
+Academy/Exchange Hub/News đều dùng cùng một mẫu `author`/`publisher` cho tín hiệu E-E-A-T
+(xem Phần 12 — bút danh "Mr Whale"):
+
+```json
+"author": { "@type": "Person", "name": "Mr Whale", "url": "https://coin680.com/about/" },
+"publisher": {
+  "@type": "Organization",
+  "name": "Coin680",
+  "url": "https://coin680.com/",
+  "logo": { "@type": "ImageObject", "url": "LOGO URL thật khi có" }
+}
+```
+
+Academy/Exchange Hub: dùng đúng khung `Article`/`BlogPosting` + `FAQPage` như FXM680.
 
 News: dùng `NewsArticle` (`@type: ["NewsArticle"]`), thêm `datePublished` chính xác giờ đăng
 thật (không hẹn giờ xa), không cần `FAQPage` trừ khi bài có mục hỏi-đáp rõ ràng.
@@ -328,6 +339,34 @@ WordPress path: /home/u185868899/domains/coin680.com/public_html
   kèm `-Depth` cho object phẳng.
 - Category/Page/Menu vẫn tạo qua REST API bình thường (payload nhỏ, không chạm ngưỡng WAF) — **chỉ
   riêng nội dung bài dài (post content) mới cần chuyển sang SSH/WP-CLI.**
+
+---
+
+## PHẦN 12 — TÍN HIỆU E-E-A-T: BÚT DANH "MR WHALE" (chốt 2026-07-28)
+
+Coin680 đứng tên nội dung dưới bút danh **Mr Whale** thay vì chỉ đứng tên tổ chức "Coin680" —
+đây là thông tin thật do chủ site cung cấp (tham gia thị trường crypto từ 2020), **không phải
+credential bịa ra**. Tuyệt đối không tự thêm chức danh/bằng cấp/kinh nghiệm nào khác ngoài chi
+tiết này trừ khi chủ site cung cấp thêm.
+
+**Nơi bút danh xuất hiện:**
+- Byline trên mọi bài viết (`single.php`): "By Mr Whale" ngay dưới tiêu đề, link tới `/about/`.
+- Author box cuối mỗi bài (`coin680_author_box()` trong `functions.php`): tên + 1 câu bio + link
+  `/about/`.
+- Trang **About Coin680** (ID 200): mục "Meet Mr Whale" giới thiệu là Founder & Content Lead.
+- Trang **Editorial Policy** (ID 199): câu mở đầu ghi rõ Mr Whale phụ trách tiêu chuẩn biên tập.
+- JSON-LD mọi bài (xem mẫu ở Phần 5.4): `author` = `Person` "Mr Whale" (`url` trỏ `/about/`),
+  `publisher` vẫn giữ `Organization` "Coin680" — đúng chuẩn schema.org tách author cá nhân khỏi
+  publisher tổ chức.
+
+**Tên hiển thị tài khoản WordPress** (user đăng bài, id 1) đã đổi `display_name` → "Mr Whale" qua
+`wp user update 1 --display_name="Mr Whale"` để tên tác giả WP khớp bút danh nếu theme/plugin nào
+đó tự lấy `the_author()`.
+
+**Việc còn để ngỏ (chưa làm, không bắt buộc):** ~31 bài Academy/News đã xuất bản trước ngày
+2026-07-28 vẫn còn JSON-LD `author` = Organization "Coin680" cũ. Chưa retrofit lại vì phải sửa
+từng bài (JSON-LD nhúng thẳng trong nội dung, không phải field riêng) — có thể làm dần nếu chủ
+site muốn đồng bộ toàn bộ, nhưng mọi bài viết **từ nay trở đi** phải dùng mẫu Person "Mr Whale".
 
 ---
 
