@@ -268,15 +268,14 @@ Xem chi tiết đầy đủ trong **`Coin680-Exchange-Hub-Roadmap.md`** (18 bài
 | Sàn | Link dùng trong bài (Pretty Link) | Trạng thái |
 |---|---|---|
 | Binance | `https://coin680.com/Binance` | ✅ Đã có |
-| Bybit | *(chưa cấu hình trong Pretty Links — cần bạn thêm)* | ❌ Thiếu |
+| Bybit | `https://coin680.com/Bybit` | ✅ Đã có (bổ sung 2026-07-28) |
 | OKX | `https://coin680.com/okx` | ✅ Đã có |
 | BingX | `https://coin680.com/bingx` | ✅ Đã có |
 | Gate | `https://coin680.com/Gate` | ✅ Đã có |
 | MEXC | `https://coin680.com/Mexc` | ✅ Đã có |
 
-Mọi bài Exchange Hub viết từ nay dùng đúng các Pretty Link ở trên làm href cho nút CTA
-("Open Account"/"Claim Bonus"), không dùng link ref gốc trực tiếp. **Riêng Bybit vẫn thiếu** —
-khi viết tới Bybit Hub cần bạn bổ sung link trong Pretty Links trước.
+Cả 6 sàn đã có Pretty Link đầy đủ. Mọi bài Exchange Hub viết từ nay dùng đúng các Pretty Link ở
+trên làm href cho nút CTA ("Open Account"/"Claim Bonus"), không dùng link ref gốc trực tiếp.
 
 **Danh mục WordPress (đã tạo, xác nhận 2026-07-27):** Crypto Market News = 2 (con: Bitcoin News=3,
 Market & Analysis=4, Business & Institutions=5, Regulation & Policy=6), Bitcoin Academy = 7
