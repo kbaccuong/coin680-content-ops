@@ -4,9 +4,10 @@
 với thứ tự cố định trong `Coin680-Bitcoin-Academy-Roadmap.md` / `Coin680-Exchange-Hub-Roadmap.md`.
 Cập nhật file này mỗi khi xuất bản bài mới.
 
-**Kiểm tra lần cuối:** 2026-07-28, qua SSH/WP-CLI (`wp post list`), post ID 71-174.
+**Kiểm tra lần cuối:** 2026-07-28, qua SSH/WP-CLI (`wp post list`), post ID 71-242.
 
-## ➡️ BÀI CẦN VIẾT TIẾP THEO: **BTA-032** (đã có chi tiết đầy đủ trong `Coin680-Bitcoin-Academy-Roadmap.md` Nhóm 1, tới tận BTA-040 — không cần soạn thêm gì trước khi viết tiếp)
+## ➡️ BÀI CẦN VIẾT TIẾP THEO: **BTA-042** (Nhóm 2 — How It Works; cần soạn tiêu đề chi tiết tiếp
+theo trong `Coin680-Bitcoin-Academy-Roadmap.md` trước khi viết, theo đúng phạm vi BTA-041–080)
 
 ## Bảng trạng thái BTA-001 → BTA-040 (Nhóm 1: Fundamentals)
 
@@ -43,7 +44,17 @@ Cập nhật file này mỗi khi xuất bản bài mới.
 | BTA-029 | Is Bitcoin a Good Investment? An Honest Overview | ✅ Hẹn giờ | Post ID 170, 14:30 UTC (21:30 VN) 30/7 |
 | BTA-030 | Bitcoin Myths and Misconceptions Explained | ✅ Hẹn giờ | Post ID 172, 15:30 UTC (22:30 VN) 30/7 |
 | BTA-031 | What Is Bitcoin Dominance? | ✅ Hẹn giờ | Post ID 174, 16:30 UTC (23:30 VN) 30/7 |
-| **BTA-032** | What Is the Bitcoin Whitepaper? | ❌ **Chưa viết** | **← Viết tiếp theo** — tiêu đề đã có sẵn trong roadmap |
+| BTA-032 | What Is the Bitcoin Whitepaper? | ✅ Hẹn giờ | Post ID 223, 07:30 UTC (14:30 VN) 31/7 |
+| BTA-033 | What Is Bitcoin Maximalism? | ✅ Hẹn giờ | Post ID 225, 08:30 UTC (15:30 VN) 31/7 |
+| BTA-034 | How Is Bitcoin Different From Other Cryptocurrencies? | ✅ Hẹn giờ | Post ID 227, 09:30 UTC (16:30 VN) 31/7 |
+| BTA-035 | What Is a Blockchain? A Beginner's Explanation | ✅ Hẹn giờ | Post ID 229, 10:30 UTC (17:30 VN) 31/7 |
+| BTA-036 | Is Bitcoin Backed by Anything? | ✅ Hẹn giờ | Post ID 231, 11:30 UTC (18:30 VN) 31/7 |
+| BTA-037 | What Is Bitcoin's Market Capitalization? | ✅ Hẹn giờ | Post ID 233, 12:30 UTC (19:30 VN) 31/7 |
+| BTA-038 | How Was Bitcoin's Price Determined Historically? | ✅ Hẹn giờ | Post ID 235, 13:30 UTC (20:30 VN) 31/7 |
+| BTA-039 | What Is a Bitcoin Fork? | ✅ Hẹn giờ | Post ID 237, 14:30 UTC (21:30 VN) 31/7 |
+| BTA-040 | Bitcoin Terms Every Beginner Must Know: Glossary | ✅ Hẹn giờ | Post ID 239, 15:30 UTC (22:30 VN) 31/7 — hoàn tất Nhóm 1 (Fundamentals) |
+| BTA-041 | What Is Bitcoin Mining? A Complete Explanation | ✅ Hẹn giờ | Post ID 241, 16:30 UTC (23:30 VN) 31/7 — bài đầu tiên Nhóm 2 (How It Works), category id 9 |
+| **BTA-042** | *(chưa có tiêu đề)* | ❌ **Chưa viết** | **← Viết tiếp theo** — cần soạn tiêu đề trong `Coin680-Bitcoin-Academy-Roadmap.md` trước (phạm vi How It Works: hash rate, node, consensus/PoW, block reward, mempool, block time, difficulty adjustment, Lightning Network) |
 
 Tất cả CTA "Continue Learning" của BTA-002→031 trỏ về `/category/bitcoin-academy/` (chưa trỏ thẳng
 bài kế tiếp vì cả loạt được đăng theo batch, không có thứ tự "đã tồn tại trước" rõ ràng giữa
