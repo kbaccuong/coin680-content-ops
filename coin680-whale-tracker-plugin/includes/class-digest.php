@@ -258,18 +258,17 @@ class Coin680Whale_Digest {
     }
 
     /**
-     * Picks up to 5 transactions, favoring variety of COIN first and
-     * classification second. Whale Alert reports every chain it tracks
-     * (not just BTC), but BTC/ETH/USDT simply have far more $500k+ transfers
-     * in any given window than smaller-cap coins -- if we only prioritized
-     * by classification or raw size, those few dominant assets would
-     * routinely claim all 5 slots and a genuinely large altcoin move that
-     * crossed the threshold would never get shown. So: first take the
-     * single largest transaction per DISTINCT symbol present in the pool
-     * (guarantees coin breadth), then only fall back to filling any
-     * remaining slots via classification variety among what's left.
+     * Picks up to 6 transactions, ONE PER DISTINCT COIN, never two entries
+     * of the same symbol in one post -- if a coin has multiple qualifying
+     * transactions in the window, only its largest is used. If fewer than 6
+     * distinct coins qualify this window, the post simply has fewer lines;
+     * it never pads out to 6 by repeating a coin already featured.
+     * Secondary priority (when there's still room after covering distinct
+     * coins) leans toward classification variety among the coins not yet
+     * picked, so exchange in/out signals aren't crowded out by, say, several
+     * "wallet transfer, purpose unclear" coins.
      */
-    private function select_diverse_items($since, $limit = 5) {
+    private function select_diverse_items($since, $limit = 6) {
         global $wpdb;
         $table = Coin680Whale_Fetcher::table_name();
         $pool = $wpdb->get_results($wpdb->prepare(
@@ -284,22 +283,26 @@ class Coin680Whale_Digest {
         $picked_ids = array();
         $picked_symbols = array();
 
-        // Pass 1: one entry per distinct symbol (largest-first order from
-        // the query), so a single dominant asset can't crowd out every slot.
+        // Pass 1: one entry per distinct symbol -- the largest transaction
+        // of that symbol, since $pool is already sorted by amount_usd DESC.
         foreach ($pool as $item) {
             if (count($picked) >= $limit) {
                 break;
             }
             $sym = strtoupper($item->symbol);
-            if (!in_array($sym, $picked_symbols, true)) {
-                $picked[] = $item;
-                $picked_ids[] = $item->id;
-                $picked_symbols[] = $sym;
+            if (in_array($sym, $picked_symbols, true)) {
+                continue;
             }
+            $picked[] = $item;
+            $picked_ids[] = $item->id;
+            $picked_symbols[] = $sym;
         }
 
-        // Pass 2: slots still open (window had fewer distinct coins than
-        // $limit) -- fill by classification variety among what's left over.
+        // Pass 2: slots still open (fewer distinct coins this window than
+        // $limit) -- nothing left to add that isn't a duplicate coin, so
+        // this pass only exists to try covering a missing classification by
+        // re-scanning for a DIFFERENT coin under that classification. It
+        // still never picks a symbol already in $picked_symbols.
         if (count($picked) < $limit) {
             $priority = array('Exchange Outflow', 'Exchange Inflow', 'Mint', 'Burn', 'Exchange to Exchange', 'Wallet Transfer');
             $have_classes = wp_list_pluck($picked, 'classification');
@@ -311,25 +314,16 @@ class Coin680Whale_Digest {
                     continue;
                 }
                 foreach ($pool as $item) {
-                    if ($item->classification === $classification && !in_array($item->id, $picked_ids, true)) {
+                    $sym = strtoupper($item->symbol);
+                    if ($item->classification === $classification
+                        && !in_array($item->id, $picked_ids, true)
+                        && !in_array($sym, $picked_symbols, true)) {
                         $picked[] = $item;
                         $picked_ids[] = $item->id;
+                        $picked_symbols[] = $sym;
                         $have_classes[] = $classification;
                         break;
                     }
-                }
-            }
-        }
-
-        // Pass 3: still short -- just take whatever's biggest and unused.
-        if (count($picked) < $limit) {
-            foreach ($pool as $item) {
-                if (count($picked) >= $limit) {
-                    break;
-                }
-                if (!in_array($item->id, $picked_ids, true)) {
-                    $picked[] = $item;
-                    $picked_ids[] = $item->id;
                 }
             }
         }
@@ -348,7 +342,7 @@ class Coin680Whale_Digest {
         }
 
         $since = gmdate('Y-m-d H:i:s', time() - self::CADENCE_SECONDS - 10 * MINUTE_IN_SECONDS);
-        $items = $this->select_diverse_items($since, 5);
+        $items = $this->select_diverse_items($since, 6);
 
         if (empty($items)) {
             update_option('coin680whale_last_digest', time());
