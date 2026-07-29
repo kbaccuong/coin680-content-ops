@@ -49,9 +49,11 @@ class Coin680Whale_Fetcher {
             to_owner_type VARCHAR(30) NOT NULL DEFAULT '',
             amount DOUBLE NOT NULL DEFAULT 0,
             amount_usd DOUBLE NOT NULL DEFAULT 0,
+            btc_price_usd DOUBLE NOT NULL DEFAULT 0,
             tx_timestamp DATETIME NOT NULL,
             hash VARCHAR(120) NOT NULL DEFAULT '',
             used_in_digest TINYINT(1) NOT NULL DEFAULT 0,
+            mega_alerted TINYINT(1) NOT NULL DEFAULT 0,
             created_at DATETIME NOT NULL,
             PRIMARY KEY (id),
             UNIQUE KEY whale_alert_id (whale_alert_id),
@@ -62,6 +64,29 @@ class Coin680Whale_Fetcher {
         if (!wp_next_scheduled('coin680whale_poll')) {
             wp_schedule_event(time(), 'coin680x_five_minutes', 'coin680whale_poll');
         }
+    }
+
+    /**
+     * Real BTC price at the moment we capture a transaction, reused later
+     * for honest historical comparisons ("last time we saw a similar move,
+     * price has since done X") -- always computed from the same cached
+     * CoinGecko feed the rest of the site uses (coin680_get_crypto_prices()
+     * in the theme), never invented.
+     */
+    private function current_btc_price() {
+        if (!function_exists('coin680_get_crypto_prices')) {
+            return 0;
+        }
+        $coins = coin680_get_crypto_prices();
+        if (!$coins) {
+            return 0;
+        }
+        foreach ($coins as $coin) {
+            if ($coin['id'] === 'bitcoin') {
+                return (float) $coin['current_price'];
+            }
+        }
+        return 0;
     }
 
     private function classify($tx) {
@@ -118,13 +143,15 @@ class Coin680Whale_Fetcher {
         global $wpdb;
         $table = self::table_name();
         $latest_ts = $start;
+        $btc_price = $this->current_btc_price();
+        $mega_threshold = isset($settings['mega_threshold']) ? (int) $settings['mega_threshold'] : 50000000;
 
         foreach ($body['transactions'] as $tx) {
             $classification = $this->classify($tx);
             $wpdb->query($wpdb->prepare(
                 "INSERT IGNORE INTO $table
-                (whale_alert_id, blockchain, symbol, transaction_type, classification, from_owner, from_owner_type, to_owner, to_owner_type, amount, amount_usd, tx_timestamp, hash, created_at)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%f,%f,%s,%s,%s)",
+                (whale_alert_id, blockchain, symbol, transaction_type, classification, from_owner, from_owner_type, to_owner, to_owner_type, amount, amount_usd, btc_price_usd, tx_timestamp, hash, created_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%f,%f,%f,%s,%s,%s)",
                 $tx['id'],
                 $tx['blockchain'],
                 $tx['symbol'],
@@ -136,11 +163,21 @@ class Coin680Whale_Fetcher {
                 $tx['to']['owner_type'] ?? 'unknown',
                 $tx['amount'],
                 $tx['amount_usd'],
+                $btc_price,
                 gmdate('Y-m-d H:i:s', $tx['timestamp']),
                 $tx['hash'],
                 current_time('mysql', true)
             ));
             $latest_ts = max($latest_ts, $tx['timestamp']);
+
+            // Only a genuinely new row (not a re-seen duplicate from an
+            // overlapping poll window) should ever trigger a breaking alert.
+            if ($wpdb->rows_affected > 0 && $tx['amount_usd'] >= $mega_threshold) {
+                $row = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE whale_alert_id = %s", $tx['id']));
+                if ($row && class_exists('Coin680Whale_Digest')) {
+                    Coin680Whale_Digest::instance()->post_mega_alert($row);
+                }
+            }
         }
 
         update_option('coin680whale_last_poll', $latest_ts + 1);
