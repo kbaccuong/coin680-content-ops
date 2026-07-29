@@ -41,9 +41,10 @@ class Coin680Whale_Admin {
         check_admin_referer('coin680whale_save_settings');
         if (!current_user_can('manage_options')) { wp_die('Not allowed.'); }
         $settings = array(
-            'api_key'        => sanitize_text_field(wp_unslash($_POST['api_key'] ?? '')),
-            'min_value'      => max(10000, (int) ($_POST['min_value'] ?? 500000)),
-            'mega_threshold' => max(1000000, (int) ($_POST['mega_threshold'] ?? 50000000)),
+            'api_key'           => sanitize_text_field(wp_unslash($_POST['api_key'] ?? '')),
+            'min_value'         => max(10000, (int) ($_POST['min_value'] ?? 500000)),
+            'altcoin_min_value' => max(10000, (int) ($_POST['altcoin_min_value'] ?? 300000)),
+            'mega_threshold'    => max(1000000, (int) ($_POST['mega_threshold'] ?? 50000000)),
         );
         update_option('coin680whale_settings', $settings);
         wp_safe_redirect(add_query_arg('saved', '1', admin_url('admin.php?page=coin680-whale-tracker')));
@@ -86,7 +87,8 @@ class Coin680Whale_Admin {
                     <?php wp_nonce_field('coin680whale_save_settings'); ?>
                     <table class="form-table">
                         <tr><th><?php esc_html_e('API Key', 'coin680-whale-tracker'); ?></th><td><input type="text" name="api_key" style="width:100%;" value="<?php echo esc_attr($settings['api_key'] ?? ''); ?>"></td></tr>
-                        <tr><th><?php esc_html_e('Minimum USD value to track', 'coin680-whale-tracker'); ?></th><td><input type="number" name="min_value" min="10000" step="10000" value="<?php echo esc_attr($settings['min_value'] ?? 500000); ?>"></td></tr>
+                        <tr><th><?php esc_html_e('Minimum USD value to track -- BTC / ETH / USDT / USDC', 'coin680-whale-tracker'); ?></th><td><input type="number" name="min_value" min="10000" step="10000" value="<?php echo esc_attr($settings['min_value'] ?? 500000); ?>"></td></tr>
+                        <tr><th><?php esc_html_e('Minimum USD value to track -- everything else (altcoins)', 'coin680-whale-tracker'); ?></th><td><input type="number" name="altcoin_min_value" min="10000" step="10000" value="<?php echo esc_attr($settings['altcoin_min_value'] ?? 300000); ?>"> <p class="description"><?php esc_html_e('Lower than the major-coin threshold on purpose -- BTC/ETH/USDT/USDC alone produce plenty of $500k+ moves, so a lower bar here is what actually gets altcoins featured.', 'coin680-whale-tracker'); ?></p></td></tr>
                         <tr><th><?php esc_html_e('Mega-transaction breaking alert threshold (USD)', 'coin680-whale-tracker'); ?></th><td><input type="number" name="mega_threshold" min="1000000" step="1000000" value="<?php echo esc_attr($settings['mega_threshold'] ?? 50000000); ?>"></td></tr>
                     </table>
                     <p>
