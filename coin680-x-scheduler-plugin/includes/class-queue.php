@@ -50,6 +50,8 @@ class Coin680X_Queue {
             status VARCHAR(20) NOT NULL DEFAULT 'pending',
             tweet_id VARCHAR(50) NOT NULL DEFAULT '',
             error_message TEXT NOT NULL DEFAULT '',
+            poll_options TEXT NOT NULL DEFAULT '',
+            poll_duration_minutes INT NOT NULL DEFAULT 0,
             created_at DATETIME NOT NULL,
             PRIMARY KEY (id),
             KEY status_scheduled (status, scheduled_at)
@@ -60,16 +62,25 @@ class Coin680X_Queue {
         }
     }
 
-    public static function add($post_text, $media_url, $first_comment, $scheduled_at_utc) {
+    public static function add($post_text, $media_url, $first_comment, $scheduled_at_utc, $poll = null) {
         global $wpdb;
-        $wpdb->insert(self::table_name(), array(
+        $data = array(
             'post_text'     => $post_text,
             'media_url'     => $media_url,
             'first_comment' => $first_comment,
             'scheduled_at'  => $scheduled_at_utc,
             'status'        => 'pending',
             'created_at'    => current_time('mysql', true),
-        ));
+        );
+        // The poll always attaches to the reply/first_comment, never the
+        // main post -- X silently drops polls on long-form "Note Tweets"
+        // (>280 chars), which our analytical posts routinely are. A poll
+        // needs a first_comment to actually go out on.
+        if ($poll && !empty($first_comment) && !empty($poll['options'])) {
+            $data['poll_options'] = wp_json_encode(array_values($poll['options']));
+            $data['poll_duration_minutes'] = max(5, min(10080, (int) ($poll['duration_minutes'] ?? 60)));
+        }
+        $wpdb->insert(self::table_name(), $data);
         return $wpdb->insert_id;
     }
 
@@ -136,7 +147,7 @@ class Coin680X_Queue {
         return $body_json['media_id_string'];
     }
 
-    private function post_tweet($text, $media_id = null, $reply_to_id = null) {
+    private function post_tweet($text, $media_id = null, $reply_to_id = null, $poll_options = null, $poll_duration = 0) {
         $url = 'https://api.twitter.com/2/tweets';
         $oauth = $this->get_oauth();
         $auth_header = $oauth->auth_header('POST', $url);
@@ -144,6 +155,11 @@ class Coin680X_Queue {
         $payload = array('text' => $text);
         if ($media_id) {
             $payload['media'] = array('media_ids' => array($media_id));
+        } elseif (!empty($poll_options)) {
+            $payload['poll'] = array(
+                'options'          => array_values($poll_options),
+                'duration_minutes' => $poll_duration ?: 60,
+            );
         }
         if ($reply_to_id) {
             $payload['reply'] = array('in_reply_to_tweet_id' => $reply_to_id);
@@ -181,6 +197,10 @@ class Coin680X_Queue {
             }
         }
 
+        // X rejects polls on long-form "Note Tweets" (>280 chars) -- since our
+        // longer analytical posts routinely exceed that, a poll only ever
+        // gets attached to the (always short) reply/first_comment instead of
+        // risking silent rejection on the main post.
         $tweet_id = $this->post_tweet($item->post_text, $media_id);
         if (is_wp_error($tweet_id)) {
             $wpdb->update($table, array('status' => 'failed', 'error_message' => $tweet_id->get_error_message()), array('id' => $item->id));
@@ -188,7 +208,8 @@ class Coin680X_Queue {
         }
 
         if (!empty($item->first_comment)) {
-            $this->post_tweet($item->first_comment, null, $tweet_id);
+            $poll_options = !empty($item->poll_options) ? json_decode($item->poll_options, true) : null;
+            $this->post_tweet($item->first_comment, null, $tweet_id, $poll_options, (int) ($item->poll_duration_minutes ?? 0));
             // A failure here doesn't roll back the main post; it's logged but the item is still "posted".
         }
 
