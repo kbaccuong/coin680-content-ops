@@ -1,0 +1,14 @@
+name: Coin680 WP-Cron Trigger
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping wp-cron.php to force WP-Cron to check for due jobs
+        run: |
+          curl -s -o /dev/null -w "wp-cron.php responded: %{http_code}\n" --max-time 25 "https://coin680.com/wp-cron.php?doing_wp_cron"
