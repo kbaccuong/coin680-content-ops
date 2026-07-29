@@ -48,11 +48,15 @@ function coin680whale_activate() {
     if (!wp_next_scheduled('coin680whale_digest_check')) {
         wp_schedule_event(time(), 'coin680x_five_minutes', 'coin680whale_digest_check');
     }
+    if (!wp_next_scheduled('coin680whale_daily_recap')) {
+        wp_schedule_event(time(), 'daily', 'coin680whale_daily_recap');
+    }
 }
 register_activation_hook(__FILE__, 'coin680whale_activate');
 
 function coin680whale_deactivate() {
     wp_clear_scheduled_hook('coin680whale_poll');
     wp_clear_scheduled_hook('coin680whale_digest_check');
+    wp_clear_scheduled_hook('coin680whale_daily_recap');
 }
 register_deactivation_hook(__FILE__, 'coin680whale_deactivate');
