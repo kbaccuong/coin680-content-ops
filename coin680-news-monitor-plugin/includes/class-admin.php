@@ -59,10 +59,15 @@ class Coin680News_Admin {
     public function render_page() {
         if (!current_user_can('manage_options')) { return; }
         $items = Coin680News_Monitor::get_recent(48, null, 150);
+        $by_id = array();
+        foreach ($items as $it) {
+            $by_id[$it->id] = $it;
+        }
         ?>
         <div class="wrap">
             <h1><?php esc_html_e('Coin680 News Monitor', 'coin680-news-monitor'); ?></h1>
             <p><?php esc_html_e('Live headlines from CoinDesk and Cointelegraph RSS feeds, last 48 hours. This is a candidate list only -- always cross-check at least one more independent source and follow the structural-variety rules before writing a coin680.com article.', 'coin680-news-monitor'); ?></p>
+            <p><?php esc_html_e('"Both sources" = CoinDesk and Cointelegraph both appear to be covering the same event (title keyword match, heuristic). "Possible duplicate" = looks similar to a post already published in Crypto Market News in the last 14 days. Both are heuristics -- verify before trusting.', 'coin680-news-monitor'); ?></p>
 
             <?php if (isset($_GET['polled'])) : ?><div class="notice notice-success"><p><?php esc_html_e('Polled both feeds.', 'coin680-news-monitor'); ?></p></div><?php endif; ?>
 
@@ -83,6 +88,7 @@ class Coin680News_Admin {
                         <th><?php esc_html_e('Source', 'coin680-news-monitor'); ?></th>
                         <th><?php esc_html_e('Title', 'coin680-news-monitor'); ?></th>
                         <th><?php esc_html_e('Status', 'coin680-news-monitor'); ?></th>
+                        <th><?php esc_html_e('Flags', 'coin680-news-monitor'); ?></th>
                     </tr></thead>
                     <tbody>
                     <?php foreach ($items as $item) : ?>
@@ -92,10 +98,22 @@ class Coin680News_Admin {
                             <td><?php echo esc_html($item->source); ?></td>
                             <td><a href="<?php echo esc_url($item->link); ?>" target="_blank"><?php echo esc_html($item->title); ?></a></td>
                             <td><?php echo esc_html($item->status); ?></td>
+                            <td>
+                                <?php if (!empty($item->cross_match_id) && isset($by_id[$item->cross_match_id])) : ?>
+                                    <span style="color:#2271b1;" title="<?php echo esc_attr($by_id[$item->cross_match_id]->title); ?>">
+                                        🔗 <?php esc_html_e('Both sources', 'coin680-news-monitor'); ?>
+                                    </span><br>
+                                <?php endif; ?>
+                                <?php if (!empty($item->duplicate_post_id)) : ?>
+                                    <span style="color:#b32d2e;">
+                                        ⚠ <a href="<?php echo esc_url(get_edit_post_link($item->duplicate_post_id)); ?>" target="_blank"><?php esc_html_e('Possible duplicate', 'coin680-news-monitor'); ?></a>
+                                    </span>
+                                <?php endif; ?>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                     <?php if (empty($items)) : ?>
-                        <tr><td colspan="5"><?php esc_html_e('No headlines tracked yet in this window.', 'coin680-news-monitor'); ?></td></tr>
+                        <tr><td colspan="6"><?php esc_html_e('No headlines tracked yet in this window.', 'coin680-news-monitor'); ?></td></tr>
                     <?php endif; ?>
                     </tbody>
                 </table>
