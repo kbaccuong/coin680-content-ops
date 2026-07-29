@@ -148,7 +148,10 @@ class Coin680Whale_Digest {
         $direction = $pct_change >= 0 ? 'up' : 'down';
         $when = human_time_diff(strtotime($match->tx_timestamp), time()) . ' ago';
         return sprintf(
-            'For context: the last similarly sized %s (%s) was captured with $BTC at $%s -- $BTC is %s %s%% since.',
+            // Plain "BTC" here, not a $BTC cashtag -- the digest's one
+            // allowed cashtag is already spent on the featured transaction's
+            // own symbol, and X rejects posts with more than one.
+            'For context: the last similarly sized %s (%s) was captured with BTC at $%s -- BTC is %s %s%% since.',
             strtolower($item->classification),
             $when,
             number_format($match->btc_price_usd),
@@ -206,11 +209,18 @@ class Coin680Whale_Digest {
     public function build_and_get_text($items, $since, $window_label = '30 min') {
         $header = "🐋 #COIN680 WHALE SIGNAL (last {$window_label}):\n\n";
         $lines = array();
+        $cashtag_used = false;
         foreach ($items as $item) {
             $amount_fmt = '$' . number_format($item->amount_usd);
             $blurb = self::classification_blurb($item->classification);
             $url = self::explorer_url($item->blockchain, $item->hash);
-            $line = "• {$amount_fmt} " . self::cashtag($item->symbol) . " {$blurb}.";
+            // X rejects an entire post outright if it contains more than one
+            // cashtag ($SYMBOL), and a 5-item digest routinely spans several
+            // different coins -- so only the single largest entry gets the
+            // cashtag treatment; the rest fall back to a plain symbol.
+            $symbol_display = $cashtag_used ? strtoupper($item->symbol) : self::cashtag($item->symbol);
+            $cashtag_used = true;
+            $line = "• {$amount_fmt} {$symbol_display} {$blurb}.";
             if ($url) {
                 $line .= " {$url}";
             }
