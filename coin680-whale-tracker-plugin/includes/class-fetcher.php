@@ -110,13 +110,23 @@ class Coin680Whale_Fetcher {
         return 'Wallet Transfer';
     }
 
+    // Coins big/liquid enough that a $500k+ move is routine, not news --
+    // everything else uses the lower altcoin threshold so a genuinely large
+    // altcoin transaction doesn't get thrown out before it's even considered.
+    const MAJOR_SYMBOLS = array('btc', 'eth', 'usdt', 'usdc');
+
     public function poll() {
         $settings = get_option('coin680whale_settings', array());
         $api_key = $settings['api_key'] ?? '';
         if (!$api_key) {
             return;
         }
-        $min_value = isset($settings['min_value']) ? (int) $settings['min_value'] : 500000;
+        $major_min_value = isset($settings['min_value']) ? (int) $settings['min_value'] : 500000;
+        $altcoin_min_value = isset($settings['altcoin_min_value']) ? (int) $settings['altcoin_min_value'] : 300000;
+        // Query Whale Alert at the LOWER of the two thresholds -- its API only
+        // takes one global min_value, so we always fetch generously and then
+        // apply the per-asset-class threshold ourselves before storing anything.
+        $query_min_value = min($major_min_value, $altcoin_min_value);
 
         $last_poll = get_option('coin680whale_last_poll');
         $start = $last_poll ? (int) $last_poll : (time() - 3600);
@@ -125,7 +135,7 @@ class Coin680Whale_Fetcher {
 
         $url = add_query_arg(array(
             'api_key'   => $api_key,
-            'min_value' => $min_value,
+            'min_value' => $query_min_value,
             'start'     => $start,
             'limit'     => 100,
         ), 'https://api.whale-alert.io/v1/transactions');
@@ -147,6 +157,14 @@ class Coin680Whale_Fetcher {
         $mega_threshold = isset($settings['mega_threshold']) ? (int) $settings['mega_threshold'] : 50000000;
 
         foreach ($body['transactions'] as $tx) {
+            $latest_ts = max($latest_ts, $tx['timestamp']);
+
+            $is_major = in_array(strtolower($tx['symbol']), self::MAJOR_SYMBOLS, true);
+            $required_min = $is_major ? $major_min_value : $altcoin_min_value;
+            if ((float) $tx['amount_usd'] < $required_min) {
+                continue;
+            }
+
             $classification = $this->classify($tx);
             $wpdb->query($wpdb->prepare(
                 "INSERT IGNORE INTO $table
@@ -168,7 +186,6 @@ class Coin680Whale_Fetcher {
                 $tx['hash'],
                 current_time('mysql', true)
             ));
-            $latest_ts = max($latest_ts, $tx['timestamp']);
 
             // Only a genuinely new row (not a re-seen duplicate from an
             // overlapping poll window) should ever trigger a breaking alert.
