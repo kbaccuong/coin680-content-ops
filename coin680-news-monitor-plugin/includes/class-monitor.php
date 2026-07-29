@@ -39,6 +39,14 @@ class Coin680News_Monitor {
         'his','her','you','your','we','our','if','while','still','just','also','both','each',
         'other','some','such','only','own','same','too','very','all','here','there','first',
         'latest','amp','vs','per',
+        // Domain-generic words that show up in almost every crypto headline and
+        // don't help tell two DIFFERENT stories apart -- without these, unrelated
+        // articles that merely share "bitcoin"/"crypto"/"market" false-matched.
+        'bitcoin','crypto','cryptocurrency','cryptocurrencies','blockchain','digital',
+        'market','markets','price','prices','coin','coins','token','tokens','news',
+        'report','reports','industry','financial','finance','investors','investor',
+        'week','today','major','global','world','firm','firms','company','companies',
+        'platform','platforms',
     );
 
     public static function instance() {
@@ -214,7 +222,7 @@ class Coin680News_Monitor {
      * within the last $lookback_days. Only touches candidates that don't
      * already have a duplicate_post_id and aren't already marked 'written'.
      */
-    public function detect_duplicates($lookback_days = 14, $threshold = 0.30, $min_common = 2) {
+    public function detect_duplicates($lookback_days = 14, $threshold = 0.38, $min_common = 3) {
         global $wpdb;
         $table = self::table_name();
 
