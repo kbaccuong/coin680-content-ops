@@ -73,6 +73,15 @@ class Coin680Whale_Digest {
         return $blurbs[$classification] ?? 'moved on-chain';
     }
 
+    /**
+     * X treats a leading $ before a ticker as a "cashtag" (clickable/
+     * searchable, same idea as a # hashtag) -- every coin symbol printed
+     * in a post should go through this rather than a bare strtoupper().
+     */
+    private static function cashtag($symbol) {
+        return '$' . strtoupper($symbol);
+    }
+
     private function current_btc_price() {
         if (!function_exists('coin680_get_crypto_prices')) {
             return 0;
@@ -139,7 +148,7 @@ class Coin680Whale_Digest {
         $direction = $pct_change >= 0 ? 'up' : 'down';
         $when = human_time_diff(strtotime($match->tx_timestamp), time()) . ' ago';
         return sprintf(
-            'For context: the last similarly sized %s (%s) was captured with BTC at $%s -- BTC is %s %s%% since.',
+            'For context: the last similarly sized %s (%s) was captured with $BTC at $%s -- $BTC is %s %s%% since.',
             strtolower($item->classification),
             $when,
             number_format($match->btc_price_usd),
@@ -201,7 +210,7 @@ class Coin680Whale_Digest {
             $amount_fmt = '$' . number_format($item->amount_usd);
             $blurb = self::classification_blurb($item->classification);
             $url = self::explorer_url($item->blockchain, $item->hash);
-            $line = "• {$amount_fmt} " . strtoupper($item->symbol) . " {$blurb}.";
+            $line = "• {$amount_fmt} " . self::cashtag($item->symbol) . " {$blurb}.";
             if ($url) {
                 $line .= " {$url}";
             }
@@ -316,7 +325,7 @@ class Coin680Whale_Digest {
         $history = $this->historical_comparison($item);
 
         $text = "🚨 #COIN680 WHALE SIGNAL -- BREAKING:\n\n";
-        $text .= "{$amount_fmt} " . strtoupper($item->symbol) . " just {$blurb}.";
+        $text .= "{$amount_fmt} " . self::cashtag($item->symbol) . " just {$blurb}.";
         if ($url) {
             $text .= " {$url}";
         }
@@ -348,7 +357,7 @@ class Coin680Whale_Digest {
         $text .= "• " . number_format($count) . " tracked transactions, totaling $" . number_format($total_volume) . " moved on-chain.\n\n";
         if ($biggest) {
             $url = self::explorer_url($biggest->blockchain, $biggest->hash);
-            $text .= "• Biggest single move: $" . number_format($biggest->amount_usd) . " " . strtoupper($biggest->symbol) . " (" . self::classification_blurb($biggest->classification) . ").";
+            $text .= "• Biggest single move: $" . number_format($biggest->amount_usd) . " " . self::cashtag($biggest->symbol) . " (" . self::classification_blurb($biggest->classification) . ").";
             if ($url) { $text .= " {$url}"; }
             $text .= "\n\n";
         }
