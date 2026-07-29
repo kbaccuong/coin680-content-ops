@@ -16,6 +16,7 @@ define('COIN680WHALE_DIR', plugin_dir_path(__FILE__));
 
 require_once COIN680WHALE_DIR . 'includes/class-fetcher.php';
 require_once COIN680WHALE_DIR . 'includes/class-admin.php';
+require_once COIN680WHALE_DIR . 'includes/class-digest.php';
 
 // Registered independently at file-load time (same pattern/interval name as
 // Coin680 X Scheduler) so this plugin's activation-time wp_schedule_event()
@@ -35,15 +36,23 @@ add_filter('cron_schedules', 'coin680whale_add_cron_interval');
 
 function coin680whale_init() {
     Coin680Whale_Fetcher::instance();
+    Coin680Whale_Digest::instance();
     if (is_admin()) {
         Coin680Whale_Admin::instance();
     }
 }
 add_action('plugins_loaded', 'coin680whale_init');
 
-register_activation_hook(__FILE__, array('Coin680Whale_Fetcher', 'create_table'));
+function coin680whale_activate() {
+    Coin680Whale_Fetcher::create_table();
+    if (!wp_next_scheduled('coin680whale_digest_check')) {
+        wp_schedule_event(time(), 'coin680x_five_minutes', 'coin680whale_digest_check');
+    }
+}
+register_activation_hook(__FILE__, 'coin680whale_activate');
 
 function coin680whale_deactivate() {
     wp_clear_scheduled_hook('coin680whale_poll');
+    wp_clear_scheduled_hook('coin680whale_digest_check');
 }
 register_deactivation_hook(__FILE__, 'coin680whale_deactivate');
