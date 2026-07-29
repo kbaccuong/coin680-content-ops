@@ -265,6 +265,21 @@ class Coin680News_Monitor {
         }
     }
 
+    /**
+     * Clears every existing cross_match_id / duplicate_post_id flag and
+     * re-runs both detectors with whatever thresholds are currently in the
+     * code. Useful after tuning the thresholds/stopwords, so old flags set
+     * under the previous rules don't linger until they age out of the 48h
+     * display window.
+     */
+    public function reset_and_recheck() {
+        global $wpdb;
+        $table = self::table_name();
+        $wpdb->query("UPDATE $table SET cross_match_id = NULL, duplicate_post_id = NULL");
+        $this->detect_cross_matches();
+        $this->detect_duplicates();
+    }
+
     public static function get_recent($hours = 48, $status = null, $limit = 100) {
         global $wpdb;
         $table = self::table_name();
