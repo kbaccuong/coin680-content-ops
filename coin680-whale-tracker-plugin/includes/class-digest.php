@@ -61,16 +61,41 @@ class Coin680Whale_Digest {
         return '';
     }
 
-    private static function classification_blurb($classification) {
-        $blurbs = array(
-            'Exchange Outflow'     => 'left an exchange for an unlabeled wallet -- often read as accumulation, not selling',
-            'Exchange Inflow'      => 'moved onto an exchange -- often read as potential sell-side pressure',
-            'Exchange to Exchange' => 'moved directly between two exchanges',
-            'Mint'                 => 'was freshly minted -- new supply entering circulation',
-            'Burn'                 => 'was burned, reducing circulating supply',
-            'Wallet Transfer'      => 'moved between two unlabeled wallets -- purpose unclear',
-        );
-        return $blurbs[$classification] ?? 'moved on-chain';
+    /**
+     * Names the actual exchange(s) whenever Whale Alert has labeled one --
+     * "left Bybit" / "moved onto OKX" / "moved from Binance to Coinbase" --
+     * rather than the generic "an exchange", falling back to generic
+     * phrasing only when Whale Alert itself has no label to offer.
+     */
+    private static function classification_blurb($item) {
+        $from = $item->from_owner;
+        $to = $item->to_owner;
+        $from_named = ($item->from_owner_type === 'exchange' && $from && strtolower($from) !== 'unknown');
+        $to_named = ($item->to_owner_type === 'exchange' && $to && strtolower($to) !== 'unknown');
+
+        switch ($item->classification) {
+            case 'Exchange Outflow':
+                return $from_named
+                    ? "left {$from} for an unlabeled wallet -- often read as accumulation, not selling"
+                    : 'left an exchange for an unlabeled wallet -- often read as accumulation, not selling';
+            case 'Exchange Inflow':
+                return $to_named
+                    ? "moved onto {$to} -- often read as potential sell-side pressure"
+                    : 'moved onto an exchange -- often read as potential sell-side pressure';
+            case 'Exchange to Exchange':
+                if ($from_named && $to_named) {
+                    return "moved from {$from} to {$to}";
+                }
+                return 'moved directly between two exchanges';
+            case 'Mint':
+                return 'was freshly minted -- new supply entering circulation';
+            case 'Burn':
+                return 'was burned, reducing circulating supply';
+            case 'Wallet Transfer':
+                return 'moved between two unlabeled wallets -- purpose unclear';
+            default:
+                return 'moved on-chain';
+        }
     }
 
     /**
@@ -212,7 +237,7 @@ class Coin680Whale_Digest {
         $cashtag_used = false;
         foreach ($items as $item) {
             $amount_fmt = '$' . number_format($item->amount_usd);
-            $blurb = self::classification_blurb($item->classification);
+            $blurb = self::classification_blurb($item);
             $url = self::explorer_url($item->blockchain, $item->hash);
             // X rejects an entire post outright if it contains more than one
             // cashtag ($SYMBOL), and a 5-item digest routinely spans several
@@ -233,42 +258,70 @@ class Coin680Whale_Digest {
     }
 
     /**
-     * Picks up to 5 transactions favoring variety of classification over
-     * pure size -- one megatransaction and four "wallet transfer, purpose
-     * unclear" entries makes for a thin, uninterpretable digest even
-     * though it's honestly the biggest data. Takes the single largest
-     * entry per distinct classification present (priority order so the
-     * most actionable signals -- exchange in/out -- claim a slot first),
-     * then fills remaining slots with whatever's next largest overall.
+     * Picks up to 5 transactions, favoring variety of COIN first and
+     * classification second. Whale Alert reports every chain it tracks
+     * (not just BTC), but BTC/ETH/USDT simply have far more $500k+ transfers
+     * in any given window than smaller-cap coins -- if we only prioritized
+     * by classification or raw size, those few dominant assets would
+     * routinely claim all 5 slots and a genuinely large altcoin move that
+     * crossed the threshold would never get shown. So: first take the
+     * single largest transaction per DISTINCT symbol present in the pool
+     * (guarantees coin breadth), then only fall back to filling any
+     * remaining slots via classification variety among what's left.
      */
     private function select_diverse_items($since, $limit = 5) {
         global $wpdb;
         $table = Coin680Whale_Fetcher::table_name();
         $pool = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM $table WHERE used_in_digest = 0 AND tx_timestamp >= %s ORDER BY amount_usd DESC LIMIT 25",
+            "SELECT * FROM $table WHERE used_in_digest = 0 AND tx_timestamp >= %s ORDER BY amount_usd DESC LIMIT 60",
             $since
         ));
         if (empty($pool)) {
             return array();
         }
 
-        $priority = array('Exchange Outflow', 'Exchange Inflow', 'Mint', 'Burn', 'Exchange to Exchange', 'Wallet Transfer');
         $picked = array();
         $picked_ids = array();
+        $picked_symbols = array();
 
-        foreach ($priority as $classification) {
-            foreach ($pool as $item) {
-                if ($item->classification === $classification && !in_array($item->id, $picked_ids, true)) {
-                    $picked[] = $item;
-                    $picked_ids[] = $item->id;
-                    break;
-                }
-            }
+        // Pass 1: one entry per distinct symbol (largest-first order from
+        // the query), so a single dominant asset can't crowd out every slot.
+        foreach ($pool as $item) {
             if (count($picked) >= $limit) {
                 break;
             }
+            $sym = strtoupper($item->symbol);
+            if (!in_array($sym, $picked_symbols, true)) {
+                $picked[] = $item;
+                $picked_ids[] = $item->id;
+                $picked_symbols[] = $sym;
+            }
         }
 
+        // Pass 2: slots still open (window had fewer distinct coins than
+        // $limit) -- fill by classification variety among what's left over.
+        if (count($picked) < $limit) {
+            $priority = array('Exchange Outflow', 'Exchange Inflow', 'Mint', 'Burn', 'Exchange to Exchange', 'Wallet Transfer');
+            $have_classes = wp_list_pluck($picked, 'classification');
+            foreach ($priority as $classification) {
+                if (count($picked) >= $limit) {
+                    break;
+                }
+                if (in_array($classification, $have_classes, true)) {
+                    continue;
+                }
+                foreach ($pool as $item) {
+                    if ($item->classification === $classification && !in_array($item->id, $picked_ids, true)) {
+                        $picked[] = $item;
+                        $picked_ids[] = $item->id;
+                        $have_classes[] = $classification;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Pass 3: still short -- just take whatever's biggest and unused.
         if (count($picked) < $limit) {
             foreach ($pool as $item) {
                 if (count($picked) >= $limit) {
@@ -330,7 +383,7 @@ class Coin680Whale_Digest {
      */
     public function post_mega_alert($item) {
         $amount_fmt = '$' . number_format($item->amount_usd);
-        $blurb = self::classification_blurb($item->classification);
+        $blurb = self::classification_blurb($item);
         $url = self::explorer_url($item->blockchain, $item->hash);
         $history = $this->historical_comparison($item);
 
@@ -367,7 +420,7 @@ class Coin680Whale_Digest {
         $text .= "• " . number_format($count) . " tracked transactions, totaling $" . number_format($total_volume) . " moved on-chain.\n\n";
         if ($biggest) {
             $url = self::explorer_url($biggest->blockchain, $biggest->hash);
-            $text .= "• Biggest single move: $" . number_format($biggest->amount_usd) . " " . self::cashtag($biggest->symbol) . " (" . self::classification_blurb($biggest->classification) . ").";
+            $text .= "• Biggest single move: $" . number_format($biggest->amount_usd) . " " . self::cashtag($biggest->symbol) . " (" . self::classification_blurb($biggest) . ").";
             if ($url) { $text .= " {$url}"; }
             $text .= "\n\n";
         }
