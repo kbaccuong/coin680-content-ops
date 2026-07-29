@@ -1,13 +1,16 @@
 <?php
 /**
- * Builds and posts the recurring "Whale Signal" digest to X.
+ * Builds and posts the recurring "Whale Signal" digest to X, plus standalone
+ * breaking alerts for mega transactions and a once-daily recap.
  *
- * Guarantees a fresh post at least once per hour (checked every 30 min),
- * using only real, already-classified transactions from Coin680Whale_Fetcher
- * -- no fabricated correlations or invented price reactions. The per-
- * classification framing below is standard, widely used analyst shorthand
- * (exchange outflow = often read as accumulation, inflow = often read as
- * potential sell pressure), not a specific claim about what will happen next.
+ * Guarantees a fresh regular post at least every 30 minutes (checked every
+ * 5 min), using only real, already-classified transactions from
+ * Coin680Whale_Fetcher -- no fabricated correlations or invented price
+ * reactions. The per-classification framing is standard, widely used
+ * analyst shorthand (exchange outflow = often read as accumulation, inflow
+ * = often read as potential sell pressure), not a specific claim about what
+ * will happen next. Historical comparisons only ever cite numbers actually
+ * stored in our own table at the time each transaction was captured.
  */
 
 if (!defined('ABSPATH')) {
@@ -16,6 +19,7 @@ if (!defined('ABSPATH')) {
 
 class Coin680Whale_Digest {
     private static $instance = null;
+    const CADENCE_SECONDS = 30 * MINUTE_IN_SECONDS;
 
     public static function instance() {
         if (self::$instance === null) {
@@ -26,6 +30,7 @@ class Coin680Whale_Digest {
 
     private function __construct() {
         add_action('coin680whale_digest_check', array($this, 'maybe_post_digest'));
+        add_action('coin680whale_daily_recap', array($this, 'post_daily_recap'));
     }
 
     private static function explorer_url($blockchain, $hash) {
@@ -68,40 +73,129 @@ class Coin680Whale_Digest {
         return $blurbs[$classification] ?? 'moved on-chain';
     }
 
-    private static function closing_line($items) {
-        $outflow = 0;
-        $inflow = 0;
-        foreach ($items as $item) {
-            if ($item->classification === 'Exchange Outflow') { $outflow++; }
-            if ($item->classification === 'Exchange Inflow') { $inflow++; }
+    private function current_btc_price() {
+        if (!function_exists('coin680_get_crypto_prices')) {
+            return 0;
         }
-        if ($outflow > $inflow) {
-            $reads = array(
-                'More coins left exchanges than entered this window -- a quiet accumulation signal, historically.',
-                'Outflows outweigh inflows here -- often a sign of long-term holders taking supply off exchanges.',
-            );
-        } elseif ($inflow > $outflow) {
-            $reads = array(
-                'More coins moved onto exchanges than off this window -- worth watching for near-term selling pressure.',
-                'Inflows outweigh outflows here -- one to watch if you\'re already positioned.',
-            );
+        $coins = coin680_get_crypto_prices();
+        if (!$coins) {
+            return 0;
+        }
+        foreach ($coins as $coin) {
+            if ($coin['id'] === 'bitcoin') {
+                return (float) $coin['current_price'];
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * Net USD flow into vs. out of exchanges across ALL qualifying
+     * transactions in the window (not just the ones featured in the post),
+     * so the headline number reflects the full picture even though only a
+     * handful of individual transactions get a line of their own.
+     */
+    private function net_exchange_flow($since) {
+        global $wpdb;
+        $table = Coin680Whale_Fetcher::table_name();
+        $inflow = (float) $wpdb->get_var($wpdb->prepare(
+            "SELECT COALESCE(SUM(amount_usd),0) FROM $table WHERE classification='Exchange Inflow' AND tx_timestamp >= %s", $since
+        ));
+        $outflow = (float) $wpdb->get_var($wpdb->prepare(
+            "SELECT COALESCE(SUM(amount_usd),0) FROM $table WHERE classification='Exchange Outflow' AND tx_timestamp >= %s", $since
+        ));
+        return array('inflow' => $inflow, 'outflow' => $outflow, 'net' => $inflow - $outflow);
+    }
+
+    /**
+     * Finds a real, previously captured transaction of similar size and
+     * the same classification, at least 6 hours old, and reports the
+     * actual BTC price change from that capture moment to right now.
+     * Returns '' if no honest match exists -- never fabricates one.
+     */
+    private function historical_comparison($item) {
+        global $wpdb;
+        $table = Coin680Whale_Fetcher::table_name();
+        $current_price = $this->current_btc_price();
+        if (!$current_price || (float) $item->amount_usd <= 0) {
+            return '';
+        }
+        $low = $item->amount_usd * 0.7;
+        $high = $item->amount_usd * 1.4;
+        $cutoff = gmdate('Y-m-d H:i:s', time() - 6 * HOUR_IN_SECONDS);
+
+        $match = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $table WHERE classification = %s AND amount_usd BETWEEN %f AND %f
+             AND btc_price_usd > 0 AND tx_timestamp < %s AND id != %d
+             ORDER BY tx_timestamp DESC LIMIT 1",
+            $item->classification, $low, $high, $cutoff, $item->id
+        ));
+
+        if (!$match) {
+            return '';
+        }
+
+        $pct_change = (($current_price - $match->btc_price_usd) / $match->btc_price_usd) * 100;
+        $direction = $pct_change >= 0 ? 'up' : 'down';
+        $when = human_time_diff(strtotime($match->tx_timestamp), time()) . ' ago';
+        return sprintf(
+            'For context: the last similarly sized %s (%s) was captured with BTC at $%s -- BTC is %s %s%% since.',
+            strtolower($item->classification),
+            $when,
+            number_format($match->btc_price_usd),
+            $direction,
+            number_format(abs($pct_change), 1)
+        );
+    }
+
+    private function build_closing_analysis($items, $since) {
+        $flow = $this->net_exchange_flow($since);
+        $net = $flow['net'];
+        $direction_word = $net > 0 ? 'into' : 'out of';
+        $abs_net_fmt = '$' . number_format(abs($net));
+
+        if (abs($net) < 250000) {
+            $flow_sentence = "Net exchange flow this window is close to flat ({$abs_net_fmt} {$direction_word} exchanges) -- no strong directional pressure either way.";
+        } elseif ($net < 0) {
+            $flow_sentence = "Net Exchange Flow: {$abs_net_fmt} moved off exchanges this window, more than came in. That kind of net outflow has historically leaned toward accumulation -- large holders parking coins in cold storage rather than positioning to sell.";
         } else {
-            $reads = array(
-                'Inflows and outflows are roughly balanced this window -- no clean directional read.',
-                'A mixed bag this hour -- no dominant flow either direction.',
-            );
+            $flow_sentence = "Net Exchange Flow: {$abs_net_fmt} moved onto exchanges this window, more than left. Net inflows like this are worth watching, since coins sitting on an exchange are coins that can be sold quickly if sentiment turns.";
         }
+
+        // Historical comparison, if a real one exists, from the single largest featured item.
+        $biggest = $items[0];
+        foreach ($items as $candidate) {
+            if ($candidate->amount_usd > $biggest->amount_usd) {
+                $biggest = $candidate;
+            }
+        }
+        $history = $this->historical_comparison($biggest);
+
+        $takeaways = array(
+            'For traders, this is a data point to weigh alongside price action, not a signal to act on alone -- exchange flows shift the available supply, they don\'t guarantee direction.',
+            'None of this guarantees where price goes next, but it does tell you where supply is moving -- and that\'s usually the part of the story raw price charts miss.',
+            'Flows like this shift how much supply is sitting in easy reach of a sale, which matters most when combined with what price is already doing.',
+        );
+
         $questions = array(
             'What\'s your read -- accumulation or distribution?',
             'Bullish or bearish signal to you? Drop your take below.',
             'Are whales buying the dip or setting up to sell? Curious what you think.',
             'Does this change how you\'re positioned right now?',
         );
-        return $reads[array_rand($reads)] . ' ' . $questions[array_rand($questions)];
+
+        $parts = array($flow_sentence);
+        if ($history) {
+            $parts[] = $history;
+        }
+        $parts[] = $takeaways[array_rand($takeaways)];
+        $parts[] = $questions[array_rand($questions)];
+
+        return implode(' ', $parts);
     }
 
-    public function build_and_get_text($items) {
-        $header = "🐋 #Coin680 Whale Signal (last hour):\n\n";
+    public function build_and_get_text($items, $since, $window_label = '30 min') {
+        $header = "🐋 #COIN680 WHALE SIGNAL (last {$window_label}):\n\n";
         $lines = array();
         foreach ($items as $item) {
             $amount_fmt = '$' . number_format($item->amount_usd);
@@ -114,7 +208,7 @@ class Coin680Whale_Digest {
             $lines[] = $line;
         }
         $body = implode("\n\n", $lines);
-        $closing = "\n\n" . self::closing_line($items);
+        $closing = "\n\n" . $this->build_closing_analysis($items, $since);
         $hashtags = "\n\n#Bitcoin #WhaleAlert #OnChain #Crypto";
         return $header . $body . $closing . $hashtags;
     }
@@ -123,11 +217,10 @@ class Coin680Whale_Digest {
      * Picks up to 5 transactions favoring variety of classification over
      * pure size -- one megatransaction and four "wallet transfer, purpose
      * unclear" entries makes for a thin, uninterpretable digest even
-     * though it's honestly the biggest data. This pulls the top candidate
-     * pool by size, takes the single largest entry per distinct
-     * classification present (in a fixed priority order so the most
-     * actionable signals -- exchange in/out -- get first claim on a slot),
-     * then fills any remaining slots with whatever's next largest overall.
+     * though it's honestly the biggest data. Takes the single largest
+     * entry per distinct classification present (priority order so the
+     * most actionable signals -- exchange in/out -- claim a slot first),
+     * then fills remaining slots with whatever's next largest overall.
      */
     private function select_diverse_items($since, $limit = 5) {
         global $wpdb;
@@ -178,11 +271,11 @@ class Coin680Whale_Digest {
 
     public function maybe_post_digest() {
         $last_digest = (int) get_option('coin680whale_last_digest', 0);
-        if ((time() - $last_digest) < HOUR_IN_SECONDS) {
+        if ((time() - $last_digest) < self::CADENCE_SECONDS) {
             return;
         }
 
-        $since = gmdate('Y-m-d H:i:s', time() - HOUR_IN_SECONDS - 15 * MINUTE_IN_SECONDS);
+        $since = gmdate('Y-m-d H:i:s', time() - self::CADENCE_SECONDS - 10 * MINUTE_IN_SECONDS);
         $items = $this->select_diverse_items($since, 5);
 
         if (empty($items)) {
@@ -190,13 +283,85 @@ class Coin680Whale_Digest {
             return;
         }
 
-        $text = $this->build_and_get_text($items);
+        $text = $this->build_and_get_text($items, $since, '30 min');
 
         if (class_exists('Coin680X_Queue')) {
-            Coin680X_Queue::add($text, '', '', current_time('mysql', true));
+            // The poll rides on this short reply, not the long main post --
+            // X drops polls silently on posts over 280 characters.
+            $poll_prompts = array(
+                "What's your read on this flow?",
+                'Quick vote -- how are you reading this one?',
+                'Curious where the room stands on this:',
+            );
+            $poll = array(
+                'options'          => array('Bullish', 'Bearish', 'Neutral'),
+                'duration_minutes' => 60,
+            );
+            Coin680X_Queue::add($text, '', $poll_prompts[array_rand($poll_prompts)], current_time('mysql', true), $poll);
         }
 
         Coin680Whale_Fetcher::mark_used(wp_list_pluck($items, 'id'));
         update_option('coin680whale_last_digest', time());
+    }
+
+    /**
+     * Standalone breaking post for a single mega transaction, fired
+     * immediately from Coin680Whale_Fetcher::poll() the moment one is
+     * captured -- doesn't wait for the next digest cycle.
+     */
+    public function post_mega_alert($item) {
+        $amount_fmt = '$' . number_format($item->amount_usd);
+        $blurb = self::classification_blurb($item->classification);
+        $url = self::explorer_url($item->blockchain, $item->hash);
+        $history = $this->historical_comparison($item);
+
+        $text = "🚨 #COIN680 WHALE SIGNAL -- BREAKING:\n\n";
+        $text .= "{$amount_fmt} " . strtoupper($item->symbol) . " just {$blurb}.";
+        if ($url) {
+            $text .= " {$url}";
+        }
+        if ($history) {
+            $text .= "\n\n{$history}";
+        }
+        $text .= "\n\n#Bitcoin #WhaleAlert #OnChain #Crypto";
+
+        if (class_exists('Coin680X_Queue')) {
+            Coin680X_Queue::add($text, '', '', current_time('mysql', true));
+        }
+        Coin680Whale_Fetcher::mark_used(array($item->id));
+    }
+
+    public function post_daily_recap() {
+        global $wpdb;
+        $table = Coin680Whale_Fetcher::table_name();
+        $since = gmdate('Y-m-d H:i:s', time() - DAY_IN_SECONDS);
+
+        $total_volume = (float) $wpdb->get_var($wpdb->prepare("SELECT COALESCE(SUM(amount_usd),0) FROM $table WHERE tx_timestamp >= %s", $since));
+        if ($total_volume <= 0) {
+            return;
+        }
+        $flow = $this->net_exchange_flow($since);
+        $biggest = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE tx_timestamp >= %s ORDER BY amount_usd DESC LIMIT 1", $since));
+        $count = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE tx_timestamp >= %s", $since));
+
+        $text = "📊 #COIN680 WHALE SIGNAL -- DAILY RECAP:\n\n";
+        $text .= "• " . number_format($count) . " tracked transactions, totaling $" . number_format($total_volume) . " moved on-chain.\n\n";
+        if ($biggest) {
+            $url = self::explorer_url($biggest->blockchain, $biggest->hash);
+            $text .= "• Biggest single move: $" . number_format($biggest->amount_usd) . " " . strtoupper($biggest->symbol) . " (" . self::classification_blurb($biggest->classification) . ").";
+            if ($url) { $text .= " {$url}"; }
+            $text .= "\n\n";
+        }
+        $net = $flow['net'];
+        $direction = $net > 0 ? 'net inflow to exchanges' : 'net outflow from exchanges';
+        $text .= "• 24h Net Exchange Flow: $" . number_format(abs($net)) . " ({$direction}).\n\n";
+        $text .= ($net < 0)
+            ? "More supply left exchanges than entered today -- a day that leaned toward accumulation."
+            : "More supply moved onto exchanges than off today -- worth watching for follow-through selling.";
+        $text .= "\n\n#Bitcoin #WhaleAlert #OnChain #Crypto";
+
+        if (class_exists('Coin680X_Queue')) {
+            Coin680X_Queue::add($text, '', '', current_time('mysql', true));
+        }
     }
 }
