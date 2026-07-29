@@ -24,6 +24,7 @@ class Coin680News_Admin {
         add_action('admin_menu', array($this, 'add_menu'));
         add_action('admin_post_coin680news_mark', array($this, 'handle_mark'));
         add_action('admin_post_coin680news_poll_now', array($this, 'handle_poll_now'));
+        add_action('admin_post_coin680news_recheck', array($this, 'handle_recheck'));
     }
 
     public function add_menu() {
@@ -56,6 +57,14 @@ class Coin680News_Admin {
         exit;
     }
 
+    public function handle_recheck() {
+        check_admin_referer('coin680news_recheck');
+        if (!current_user_can('manage_options')) { wp_die('Not allowed.'); }
+        Coin680News_Monitor::instance()->reset_and_recheck();
+        wp_safe_redirect(add_query_arg('rechecked', '1', admin_url('admin.php?page=coin680-news-monitor')));
+        exit;
+    }
+
     public function render_page() {
         if (!current_user_can('manage_options')) { return; }
         $items = Coin680News_Monitor::get_recent(48, null, 150);
@@ -70,11 +79,17 @@ class Coin680News_Admin {
             <p><?php esc_html_e('"Both sources" = CoinDesk and Cointelegraph both appear to be covering the same event (title keyword match, heuristic). "Possible duplicate" = looks similar to a post already published in Crypto Market News in the last 14 days. Both are heuristics -- verify before trusting.', 'coin680-news-monitor'); ?></p>
 
             <?php if (isset($_GET['polled'])) : ?><div class="notice notice-success"><p><?php esc_html_e('Polled both feeds.', 'coin680-news-monitor'); ?></p></div><?php endif; ?>
+            <?php if (isset($_GET['rechecked'])) : ?><div class="notice notice-success"><p><?php esc_html_e('Cleared old flags and re-ran matching with current settings.', 'coin680-news-monitor'); ?></p></div><?php endif; ?>
 
-            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;">
                 <input type="hidden" name="action" value="coin680news_poll_now">
                 <?php wp_nonce_field('coin680news_poll_now'); ?>
                 <button type="submit" class="button" style="margin-bottom:12px;"><?php esc_html_e('Poll Feeds Now', 'coin680-news-monitor'); ?></button>
+            </form>
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block; margin-left:8px;">
+                <input type="hidden" name="action" value="coin680news_recheck">
+                <?php wp_nonce_field('coin680news_recheck'); ?>
+                <button type="submit" class="button" style="margin-bottom:12px;" title="<?php esc_attr_e('Clears every existing Both-sources/Possible-duplicate flag and re-scores everything with the current thresholds.', 'coin680-news-monitor'); ?>"><?php esc_html_e('Reset & Recheck Matches', 'coin680-news-monitor'); ?></button>
             </form>
 
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
