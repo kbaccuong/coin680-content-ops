@@ -77,13 +77,19 @@ Inflow/Outflow/to-Exchange, Mint, Burn, Wallet Transfer) dựa theo nhãn owner_
 Alert — **có nêu tên sàn cụ thể khi Whale Alert gắn nhãn** (vd "moved from Binance to Coinbase").
 
 Tính năng:
-- Đăng bài định kỳ **tối đa 30 phút/bài** (tự kiểm tra mỗi 5 phút qua cron).
-- **Chọn đa dạng COIN trước, loại giao dịch sau** (sửa 2026-07-29 tối) — lấy giao dịch lớn nhất
-  của MỖI coin khác nhau trong pool trước (tối đa 60 giao dịch top theo USD), chỉ lấp chỗ trống
-  còn lại bằng đa dạng classification như cũ. Lý do: BTC/ETH/USDT/USDC luôn có nhiều giao dịch
-  >$500k hơn hẳn altcoin trong bất kỳ khung 30 phút nào, nên nếu chỉ ưu tiên theo classification
-  hoặc size thô, các coin lớn sẽ chiếm hết 5 chỗ, altcoin dù đủ điều kiện cũng không bao giờ
-  được đăng. Người dùng phản hồi thấy dữ liệu "nhàm chán, chỉ toàn BTC/USDT/ETH" trước khi sửa.
+- **KHÔNG còn mốc thời gian cố định** (đổi 2026-07-29 tối, thay cho "tối đa 30 phút/bài" trước đó
+  theo yêu cầu ban đầu) — giờ **chỉ đăng khi gom đủ 6 coin khác nhau** (không quan tâm mất bao lâu),
+  ưu tiên nội dung phong phú hơn tần suất cố định. Vẫn kiểm tra mỗi 5 phút qua cron, nhưng chỉ thực
+  sự đăng khi đủ điều kiện. Tiêu đề bài tự tính đúng khoảng thời gian thực tế (vd "last 47 min")
+  thay vì hiển thị cố định "30 min".
+- **Chọn đa dạng COIN trước, loại giao dịch sau, KHÔNG BAO GIỜ trùng coin trong 1 bài** (sửa
+  2026-07-29 tối, 2 lần — lần đầu còn bug để lọt trùng coin ở bước lấp chỗ trống, đã vá) — lấy giao
+  dịch lớn nhất của MỖI coin khác nhau trong pool (tối đa 60 giao dịch top theo USD), tối đa
+  **6 coin/bài**, không đủ 6 thì đăng ít hơn chứ không lặp coin để lấp đầy. Lý do: BTC/ETH/USDT/USDC
+  luôn có nhiều giao dịch >$500k hơn hẳn altcoin trong bất kỳ khung giờ nào, nên nếu chỉ ưu tiên
+  theo classification hoặc size thô, các coin lớn sẽ chiếm hết chỗ, altcoin dù đủ điều kiện cũng
+  không bao giờ được đăng. Người dùng phản hồi thấy dữ liệu "nhàm chán, chỉ toàn BTC/USDT/ETH"
+  trước khi sửa.
 - **Ngưỡng USD tách riêng theo nhóm coin** (thêm 2026-07-29 tối): BTC/ETH/USDT/USDC dùng ngưỡng
   `min_value` (mặc định $500k), **mọi coin khác dùng ngưỡng `altcoin_min_value` thấp hơn hẳn
   (mặc định $300k)** — vì nếu dùng chung 1 ngưỡng, altcoin hiếm khi đủ lớn để lọt qua so với
