@@ -3,14 +3,18 @@
  * Builds and posts the recurring "Whale Signal" digest to X, plus standalone
  * breaking alerts for mega transactions and a once-daily recap.
  *
- * Guarantees a fresh regular post at least every 30 minutes (checked every
- * 5 min), using only real, already-classified transactions from
- * Coin680Whale_Fetcher -- no fabricated correlations or invented price
- * reactions. The per-classification framing is standard, widely used
- * analyst shorthand (exchange outflow = often read as accumulation, inflow
- * = often read as potential sell pressure), not a specific claim about what
- * will happen next. Historical comparisons only ever cite numbers actually
- * stored in our own table at the time each transaction was captured.
+ * No fixed time cadence -- checked every 5 min, but only actually posts once
+ * at least 6 DISTINCT coins have accumulated since the last post (however
+ * long that takes). Prioritizes a genuinely varied post over a guaranteed
+ * posting interval; per direct feedback, a thin 1-2-coin post every 30
+ * minutes was worse than an occasional longer gap for a fuller post. Uses
+ * only real, already-classified transactions from Coin680Whale_Fetcher --
+ * no fabricated correlations or invented price reactions. The
+ * per-classification framing is standard, widely used analyst shorthand
+ * (exchange outflow = often read as accumulation, inflow = often read as
+ * potential sell pressure), not a specific claim about what will happen
+ * next. Historical comparisons only ever cite numbers actually stored in
+ * our own table at the time each transaction was captured.
  */
 
 if (!defined('ABSPATH')) {
@@ -19,7 +23,7 @@ if (!defined('ABSPATH')) {
 
 class Coin680Whale_Digest {
     private static $instance = null;
-    const CADENCE_SECONDS = 30 * MINUTE_IN_SECONDS;
+    const MIN_COINS_TO_POST = 6;
 
     public static function instance() {
         if (self::$instance === null) {
@@ -335,31 +339,40 @@ class Coin680Whale_Digest {
         return $picked;
     }
 
+    /**
+     * Checked every 5 min (via cron), but only actually posts once at least
+     * MIN_COINS_TO_POST distinct coins are sitting unused -- no time-based
+     * trigger at all anymore. $since is the oldest still-unused transaction
+     * (i.e. effectively "since the last post"), used both to scope
+     * net_exchange_flow() and to build an honest, dynamic window label
+     * ("last 42 min") instead of a hardcoded one.
+     */
     public function maybe_post_digest() {
-        $last_digest = (int) get_option('coin680whale_last_digest', 0);
-        if ((time() - $last_digest) < self::CADENCE_SECONDS) {
+        global $wpdb;
+        $table = Coin680Whale_Fetcher::table_name();
+        $since = $wpdb->get_var("SELECT MIN(tx_timestamp) FROM $table WHERE used_in_digest = 0");
+        if (!$since) {
             return;
         }
 
-        $since = gmdate('Y-m-d H:i:s', time() - self::CADENCE_SECONDS - 10 * MINUTE_IN_SECONDS);
-        $items = $this->select_diverse_items($since, 6);
-
-        if (empty($items)) {
-            update_option('coin680whale_last_digest', time());
+        $items = $this->select_diverse_items($since, self::MIN_COINS_TO_POST);
+        if (count($items) < self::MIN_COINS_TO_POST) {
             return;
         }
 
-        $text = $this->build_and_get_text($items, $since, '30 min');
+        $minutes = max(1, (int) round((time() - strtotime($since)) / 60));
+        $window_label = "{$minutes} min";
+
+        $text = $this->build_and_get_text($items, $since, $window_label);
 
         if (class_exists('Coin680X_Queue')) {
             // Single post only -- no first-comment/poll reply. A reply on
-            // every 30-minute post read as extra noise in the channel rather
-            // than added value, so this was removed per direct feedback.
+            // every post read as extra noise in the channel rather than
+            // added value, so this was removed per direct feedback.
             Coin680X_Queue::add($text, '', '', current_time('mysql', true));
         }
 
         Coin680Whale_Fetcher::mark_used(wp_list_pluck($items, 'id'));
-        update_option('coin680whale_last_digest', time());
     }
 
     /**
