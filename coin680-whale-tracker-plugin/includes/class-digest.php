@@ -119,19 +119,71 @@ class Coin680Whale_Digest {
         return $header . $body . $closing . $hashtags;
     }
 
+    /**
+     * Picks up to 5 transactions favoring variety of classification over
+     * pure size -- one megatransaction and four "wallet transfer, purpose
+     * unclear" entries makes for a thin, uninterpretable digest even
+     * though it's honestly the biggest data. This pulls the top candidate
+     * pool by size, takes the single largest entry per distinct
+     * classification present (in a fixed priority order so the most
+     * actionable signals -- exchange in/out -- get first claim on a slot),
+     * then fills any remaining slots with whatever's next largest overall.
+     */
+    private function select_diverse_items($since, $limit = 5) {
+        global $wpdb;
+        $table = Coin680Whale_Fetcher::table_name();
+        $pool = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM $table WHERE used_in_digest = 0 AND tx_timestamp >= %s ORDER BY amount_usd DESC LIMIT 25",
+            $since
+        ));
+        if (empty($pool)) {
+            return array();
+        }
+
+        $priority = array('Exchange Outflow', 'Exchange Inflow', 'Mint', 'Burn', 'Exchange to Exchange', 'Wallet Transfer');
+        $picked = array();
+        $picked_ids = array();
+
+        foreach ($priority as $classification) {
+            foreach ($pool as $item) {
+                if ($item->classification === $classification && !in_array($item->id, $picked_ids, true)) {
+                    $picked[] = $item;
+                    $picked_ids[] = $item->id;
+                    break;
+                }
+            }
+            if (count($picked) >= $limit) {
+                break;
+            }
+        }
+
+        if (count($picked) < $limit) {
+            foreach ($pool as $item) {
+                if (count($picked) >= $limit) {
+                    break;
+                }
+                if (!in_array($item->id, $picked_ids, true)) {
+                    $picked[] = $item;
+                    $picked_ids[] = $item->id;
+                }
+            }
+        }
+
+        usort($picked, function ($a, $b) {
+            return $b->amount_usd <=> $a->amount_usd;
+        });
+
+        return $picked;
+    }
+
     public function maybe_post_digest() {
         $last_digest = (int) get_option('coin680whale_last_digest', 0);
         if ((time() - $last_digest) < HOUR_IN_SECONDS) {
             return;
         }
 
-        global $wpdb;
-        $table = Coin680Whale_Fetcher::table_name();
         $since = gmdate('Y-m-d H:i:s', time() - HOUR_IN_SECONDS - 15 * MINUTE_IN_SECONDS);
-        $items = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM $table WHERE used_in_digest = 0 AND tx_timestamp >= %s ORDER BY amount_usd DESC LIMIT 5",
-            $since
-        ));
+        $items = $this->select_diverse_items($since, 5);
 
         if (empty($items)) {
             update_option('coin680whale_last_digest', time());
