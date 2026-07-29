@@ -1,4 +1,4 @@
-# Coin680 — Project Status (cập nhật lần cuối: 2026-07-29)
+# Coin680 — Project Status (cập nhật lần cuối: 2026-07-29, tối)
 
 File này là bản tóm tắt "đọc là hiểu hết" — dùng khi bắt đầu 1 phiên làm việc mới, chỉ cần
 đọc file này thay vì phải giải thích lại từ đầu. Các quy tắc/spec chi tiết vẫn nằm ở các file
@@ -78,7 +78,21 @@ Alert — **có nêu tên sàn cụ thể khi Whale Alert gắn nhãn** (vd "mov
 
 Tính năng:
 - Đăng bài định kỳ **tối đa 30 phút/bài** (tự kiểm tra mỗi 5 phút qua cron).
-- Chọn đa dạng loại giao dịch (không chỉ lấy top-size, ưu tiên 1 giao dịch/loại trước).
+- **Chọn đa dạng COIN trước, loại giao dịch sau** (sửa 2026-07-29 tối) — lấy giao dịch lớn nhất
+  của MỖI coin khác nhau trong pool trước (tối đa 60 giao dịch top theo USD), chỉ lấp chỗ trống
+  còn lại bằng đa dạng classification như cũ. Lý do: BTC/ETH/USDT/USDC luôn có nhiều giao dịch
+  >$500k hơn hẳn altcoin trong bất kỳ khung 30 phút nào, nên nếu chỉ ưu tiên theo classification
+  hoặc size thô, các coin lớn sẽ chiếm hết 5 chỗ, altcoin dù đủ điều kiện cũng không bao giờ
+  được đăng. Người dùng phản hồi thấy dữ liệu "nhàm chán, chỉ toàn BTC/USDT/ETH" trước khi sửa.
+- **Ngưỡng USD tách riêng theo nhóm coin** (thêm 2026-07-29 tối): BTC/ETH/USDT/USDC dùng ngưỡng
+  `min_value` (mặc định $500k), **mọi coin khác dùng ngưỡng `altcoin_min_value` thấp hơn hẳn
+  (mặc định $300k)** — vì nếu dùng chung 1 ngưỡng, altcoin hiếm khi đủ lớn để lọt qua so với
+  BTC/USDT. Whale Alert API chỉ nhận 1 `min_value` toàn cục nên code luôn gọi API ở ngưỡng THẤP
+  HƠN trong 2 ngưỡng, rồi tự lọc lại theo từng nhóm coin trước khi lưu vào DB. Cả 2 ngưỡng chỉnh
+  được ở trang admin.
+- **Không còn poll/first-comment kèm bài** (bỏ 2026-07-29 tối, theo phản hồi trực tiếp: "đơn bị
+  spam kênh") — mỗi chu kỳ giờ chỉ đăng **1 bài duy nhất**, không có reply/poll nữa. (Bài mega
+  alert và daily recap vốn đã không có poll từ trước, không đổi.)
 - **Net Exchange Flow** thật (tổng inflow trừ outflow toàn bộ khung giờ, không chỉ 5 giao dịch hiển thị).
 - **So sánh lịch sử thật** — lưu giá BTC tại đúng thời điểm mỗi giao dịch, so sánh với giao dịch
   tương tự trong quá khứ (không bịa tương quan).
@@ -86,7 +100,8 @@ Tính năng:
 - **Daily Recap** 1 lần/ngày (tổng khối lượng, giao dịch lớn nhất, net flow 24h).
 - Mọi mã coin có `$` phía trước ($BTC, $ETH...) — nhưng chỉ 1 cái/bài vì giới hạn X.
 - Tiêu đề: `🐋 #COIN680 WHALE SIGNAL` (viết hoa), có link tx thật cho mỗi giao dịch.
-- Trang admin: **wp-admin → Whale Tracker** (cấu hình key, ngưỡng, xem 24h gần nhất).
+- Trang admin: **wp-admin → Whale Tracker** (cấu hình key, 2 ngưỡng min_value, mega threshold, xem
+  24h gần nhất).
 
 ### 4.4. Coin680 News Monitor — quét tin tức 2 nguồn
 Tự động lấy RSS feed CoinDesk + Cointelegraph mỗi 5 phút, lưu tiêu đề/link/tóm tắt vào bảng
@@ -128,6 +143,13 @@ so khớp từ khóa Jaccard similarity trên tiêu đề, đã loại các từ
   — mọi thứ cần tài khoản/đăng nhập web đều cần bạn tự làm, tôi chỉ dùng key bạn cung cấp.
 - **GitHub PAT hiện tại thiếu quyền "workflow"** — không tạo/sửa/xoá được file trong
   `.github/workflows/` qua API, phải làm tay qua giao diện web GitHub.
+- **SSH bị chặn hoàn toàn từ 2026-07-29** — an toàn Claude Code chặn mọi thao tác đọc/ghi private
+  key SSH (kể cả chỉ để kiểm tra file có tồn tại), không chỉ riêng lúc ghi key mới. Áp dụng cho
+  MỌI plugin, không riêng News Monitor. **Quy trình deploy code cập nhật cho tới khi có cách khác:**
+  (1) sửa code local → (2) push lên GitHub (vẫn dùng được qua Contents API bằng PAT) → (3) dán
+  nguyên nội dung file vào chat để bạn copy → (4) bạn tự lưu file + upload đè qua Hostinger hPanel
+  → File Manager (không cần SSH) → (5) tôi kiểm tra lại qua REST API (chỉ xem được version plugin,
+  không xem được nội dung/kết quả cụ thể) hoặc nhờ bạn chụp màn hình trang admin liên quan.
 
 ---
 
