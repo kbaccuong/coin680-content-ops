@@ -358,18 +358,10 @@ class Coin680Whale_Digest {
         $text = $this->build_and_get_text($items, $since, '30 min');
 
         if (class_exists('Coin680X_Queue')) {
-            // The poll rides on this short reply, not the long main post --
-            // X drops polls silently on posts over 280 characters.
-            $poll_prompts = array(
-                "What's your read on this flow?",
-                'Quick vote -- how are you reading this one?',
-                'Curious where the room stands on this:',
-            );
-            $poll = array(
-                'options'          => array('Bullish', 'Bearish', 'Neutral'),
-                'duration_minutes' => 60,
-            );
-            Coin680X_Queue::add($text, '', $poll_prompts[array_rand($poll_prompts)], current_time('mysql', true), $poll);
+            // Single post only -- no first-comment/poll reply. A reply on
+            // every 30-minute post read as extra noise in the channel rather
+            // than added value, so this was removed per direct feedback.
+            Coin680X_Queue::add($text, '', '', current_time('mysql', true));
         }
 
         Coin680Whale_Fetcher::mark_used(wp_list_pluck($items, 'id'));
