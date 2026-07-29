@@ -107,7 +107,26 @@ category "Bitcoin Academy" để không làm loãng topical authority của nộ
 
 ---
 
-## 5. Việc cần bạn xác nhận
+## 6. Đăng kèm lên X (Twitter) — quy tắc từ 2026-07-29
+
+Mỗi bài News (và có thể cả Academy nếu được yêu cầu) khi viết + đăng/lên lịch trên coin680.com,
+**đồng thời soạn 1 bài X đi kèm**, đăng qua plugin riêng **Coin680 X Scheduler** (wp-admin → X
+Scheduler; DB `wp_coin680_x_queue`, cron tự chạy mỗi 5 phút, không giới hạn số bài, không qua
+Ayrshare) — xem chi tiết plugin tại `coin680-x-scheduler-plugin/` (đã đẩy GitHub).
+
+**Nguyên tắc:**
+- Giờ đăng X = **đúng giờ bài viết xuất bản trên web** (không lệch).
+- Nội dung ngắn gọn, tự nhiên, **giọng văn/kiểu mở đầu luôn khác nhau giữa các bài** (số liệu, câu
+  hỏi, trích dẫn, tình huống...), giống nguyên tắc đa dạng cấu trúc ở Mục 3.
+- Kèm ảnh đại diện của bài viết (media_url là link ảnh đã upload lên coin680.com).
+- **3-6 hashtag chọn thủ công theo đúng chủ đề bài viết** (không dùng danh sách ngẫu nhiên chung
+  chung — ví dụ bài về Ethereum dùng #Ethereum, bài về stablecoin dùng #Stablecoins, không trộn
+  lẫn giữa các bài).
+- Bình luận đầu tiên (first comment) luôn dẫn link bài viết gốc kèm 1 câu mời đọc thêm, câu mời
+  cũng nên thay đổi cách diễn đạt giữa các bài.
+- Tài khoản X: @coin680, credentials lưu tại wp option `coin680x_settings` (đã cấu hình sẵn).
+
+## 7. Việc cần bạn xác nhận
 
 1. Cadence 1-2 bài/ngày (08:00 + 20:00 giờ VN) có phù hợp không, hay muốn tần suất khác?
 2. Có muốn tôi tự động hoá qua cron ngay khi site sẵn sàng, hay giai đoạn đầu vẫn viết thủ công
