@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Coin680 News Monitor
- * Description: Polls CoinDesk and Cointelegraph's RSS feeds for new headlines and stores them as a reviewable candidate list -- it does NOT auto-write or auto-publish articles. Cross-checking sources, verifying facts, and writing coin680.com's own News articles stays a manual/reviewed step, per Coin680-News-Playbook.md.
- * Version: 1.0.0
+ * Description: Polls CoinDesk and Cointelegraph's RSS feeds for new headlines and stores them as a reviewable candidate list -- it does NOT auto-write or auto-publish articles. Flags likely cross-source matches and likely duplicates of already-published posts to speed up review. Cross-checking sources, verifying facts, and writing coin680.com's own News articles stays a manual/reviewed step, per Coin680-News-Playbook.md.
+ * Version: 1.1.0
  * Author: Coin680
  * License: GPLv2 or later
  * Text Domain: coin680-news-monitor
@@ -32,10 +32,16 @@ function coin680news_add_cron_interval($schedules) {
 }
 add_filter('cron_schedules', 'coin680news_add_cron_interval');
 
+const COIN680NEWS_DB_VERSION = '1.1';
+
 function coin680news_init() {
     Coin680News_Monitor::instance();
     if (is_admin()) {
         Coin680News_Admin::instance();
+    }
+    if (get_option('coin680news_db_version') !== COIN680NEWS_DB_VERSION) {
+        Coin680News_Monitor::create_table();
+        update_option('coin680news_db_version', COIN680NEWS_DB_VERSION);
     }
 }
 add_action('plugins_loaded', 'coin680news_init');
