@@ -156,6 +156,19 @@ so khớp từ khóa Jaccard similarity trên tiêu đề, đã loại các từ
   nguyên nội dung file vào chat để bạn copy → (4) bạn tự lưu file + upload đè qua Hostinger hPanel
   → File Manager (không cần SSH) → (5) tôi kiểm tra lại qua REST API (chỉ xem được version plugin,
   không xem được nội dung/kết quả cụ thể) hoặc nhờ bạn chụp màn hình trang admin liên quan.
+- **REST API để đăng bài dài (News/Academy) không ổn định, phát hiện tối 2026-07-29** — vì SSH bị
+  chặn, thử dùng REST (`/wp/v2/posts` với Application Password) làm đường thay thế duy nhất. Kết
+  quả: WAF của Hostinger **âm thầm trả về HTTP 200 "thành công" nhưng xoá rỗng nội dung** một cách
+  không ổn định — không rõ ràng là do dung lượng, do có thẻ `<script>` (JSON-LD), do độ phức tạp
+  HTML (khối `tiny-cta-multi` nhiều div lồng), hay do gọi API dồn dập nhiều lần liên tiếp (nghi ngờ
+  nhiều nhất — cùng 1 nội dung có lúc đăng được, có lúc không, không tái lập ổn định theo quy tắc
+  rõ ràng nào). **Không phải do Coin680 Shield** (đã kiểm tra code, firewall của Shield chỉ quét
+  URL/GET param, không quét POST body, và trả về 403 chứ không phải 200-rỗng).
+  **Kết luận thực dụng:** REST chỉ dùng được cho bài **ngắn, đơn giản** (không có thẻ `<script>`,
+  không dùng khối CTA nhiều div — dùng link `<a>` đơn giản thay thế), và nên **giãn cách vài phút
+  giữa các lần gọi**, luôn xác nhận lại nội dung thật sự lưu được (không tin vào status "OK").
+  Cách chắc ăn nhất hiện tại vẫn là **đăng thủ công qua wp-admin** (Posts → Add New, dán HTML vào
+  chế độ Code editor) cho tới khi SSH dùng lại được.
 
 ---
 
@@ -166,6 +179,11 @@ so khớp từ khóa Jaccard similarity trên tiêu đề, đã loại các từ
   Works").
 - **Crypto Market News:** ~30+ bài, xem trực tiếp qua `wp post list --category_name=crypto-market-news`
   (không track theo ID cố định như Academy).
+- **6 bài News đã soạn sẵn, CHƯA đăng** (tối 2026-07-29, xem file `news-drafts-2026-07-29.md` —
+  đã push GitHub): BitMEX shutdown, CLARITY Act deadline, Cardano/Hedera DeRec Alliance, tokenized
+  stocks $2.3B record, TRM Labs Iran/CoinEx, Coinbase Canada CEO. Mỗi bài kèm sẵn HTML, JSON-LD,
+  bài X đi kèm + câu comment dẫn link. Đang chờ quyết định cách đăng (REST không ổn định, SSH bị
+  chặn) — xem mục 5 để biết chi tiết giới hạn.
 - **Exchange Hub:** chưa bắt đầu viết (ưu tiên Academy trước theo đúng thứ tự).
 - **Trang tĩnh:** About, Editorial Policy, Advertising Disclosure, Risk Disclaimer, Contact — đã
   xong đủ cho E-E-A-T.
