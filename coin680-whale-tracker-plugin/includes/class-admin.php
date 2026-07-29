@@ -41,8 +41,9 @@ class Coin680Whale_Admin {
         check_admin_referer('coin680whale_save_settings');
         if (!current_user_can('manage_options')) { wp_die('Not allowed.'); }
         $settings = array(
-            'api_key'   => sanitize_text_field(wp_unslash($_POST['api_key'] ?? '')),
-            'min_value' => max(10000, (int) ($_POST['min_value'] ?? 500000)),
+            'api_key'        => sanitize_text_field(wp_unslash($_POST['api_key'] ?? '')),
+            'min_value'      => max(10000, (int) ($_POST['min_value'] ?? 500000)),
+            'mega_threshold' => max(1000000, (int) ($_POST['mega_threshold'] ?? 50000000)),
         );
         update_option('coin680whale_settings', $settings);
         wp_safe_redirect(add_query_arg('saved', '1', admin_url('admin.php?page=coin680-whale-tracker')));
@@ -86,6 +87,7 @@ class Coin680Whale_Admin {
                     <table class="form-table">
                         <tr><th><?php esc_html_e('API Key', 'coin680-whale-tracker'); ?></th><td><input type="text" name="api_key" style="width:100%;" value="<?php echo esc_attr($settings['api_key'] ?? ''); ?>"></td></tr>
                         <tr><th><?php esc_html_e('Minimum USD value to track', 'coin680-whale-tracker'); ?></th><td><input type="number" name="min_value" min="10000" step="10000" value="<?php echo esc_attr($settings['min_value'] ?? 500000); ?>"></td></tr>
+                        <tr><th><?php esc_html_e('Mega-transaction breaking alert threshold (USD)', 'coin680-whale-tracker'); ?></th><td><input type="number" name="mega_threshold" min="1000000" step="1000000" value="<?php echo esc_attr($settings['mega_threshold'] ?? 50000000); ?>"></td></tr>
                     </table>
                     <p>
                         <button type="submit" class="button button-primary"><?php esc_html_e('Save Settings', 'coin680-whale-tracker'); ?></button>
