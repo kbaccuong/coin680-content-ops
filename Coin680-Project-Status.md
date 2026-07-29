@@ -94,8 +94,24 @@ Tự động lấy RSS feed CoinDesk + Cointelegraph mỗi 5 phút, lưu tiêu �
 → News Monitor**. Mục đích: tôi (Claude) tra danh sách này thay vì tự search lại mỗi lần, việc viết
 bài thật vẫn cần đối chiếu ≥2 nguồn + kiểm chứng thủ công (xem `Coin680-News-Playbook.md`).
 
-**Chưa xây (mới thảo luận, chưa build):** tự động đối chiếu chéo 2 nguồn (auto-flag khi CoinDesk +
-Cointelegraph cùng đưa 1 tin) + tự động phát hiện trùng với bài đã đăng trên coin680.com.
+**Đã xây thêm (2026-07-29):** 2 tính năng phát hiện tự động, chạy sau mỗi lần poll (không phải AI,
+so khớp từ khóa Jaccard similarity trên tiêu đề, đã loại các từ chung chung như "bitcoin"/"crypto"/
+"market" để đỡ báo nhầm):
+- **🔗 Both sources** — CoinDesk và Cointelegraph cùng đưa tin 1 sự kiện (liên kết 2 chiều qua
+  cột `cross_match_id`). Đã kiểm chứng đúng nhiều lần (vd tin BNY transfer agency, tin Pavel Durov,
+  tin Ionic Digital/Celsius Nasdaq debut).
+- **⚠ Possible duplicate** — tiêu đề trông giống bài đã đăng trong category `crypto-market-news`
+  14 ngày gần nhất (cột `duplicate_post_id`, có link thẳng tới bài cũ để so sánh). Ngưỡng:
+  Jaccard ≥ 0.38, tối thiểu 3 từ khoá trùng.
+- Nút **"Reset & Recheck Matches"** trong trang admin: xoá hết cờ cũ, chấm điểm lại toàn bộ ngay
+  bằng ngưỡng hiện tại trong code (hữu ích sau khi chỉnh threshold, không cần đợi item cũ trôi
+  khỏi cửa sổ hiển thị 48h).
+- Cả 2 chỉ mang tính **gợi ý để kiểm tra**, không tự chặn/xoá gì — luôn bấm vào xem bài cũ trước
+  khi quyết định bỏ qua chủ đề.
+- **Giới hạn deploy đã gặp:** không deploy được qua SSH (an toàn Claude Code chặn thao tác xử lý
+  SSH private key ngay cả để đọc), nên các bản cập nhật plugin này phải đi qua: push code lên
+  GitHub → tải/copy-paste thủ công → upload đè qua Hostinger hPanel File Manager. Không dùng SSH
+  cho plugin này được nữa cho tới khi có cách khác.
 
 ---
 
@@ -130,12 +146,15 @@ Cointelegraph cùng đưa 1 tin) + tự động phát hiện trùng với bài �
 
 ## 7. Việc đang để ngỏ / có thể làm tiếp
 
-1. Build đối chiếu chéo nguồn + chống trùng lặp cho News Monitor (đã đề xuất, chờ xác nhận).
+1. ~~Build đối chiếu chéo nguồn + chống trùng lặp cho News Monitor~~ — **đã xong và đã kiểm chứng
+   2026-07-29**, xem mục 4.4.
 2. Nộp Coin680 Shield lên WordPress.org (đang chuẩn bị readme.txt).
 3. Retrofit JSON-LD `author` từ Organization → Person "Mr Whale" cho ~31 bài đăng trước
    2026-07-28 (hiện chỉ áp dụng cho bài mới, không bắt buộc).
 4. Tiếp tục viết BTA-042 trở đi (cần soạn tiêu đề Nhóm 2 "How It Works" trước).
 5. Cân nhắc cron job thật qua Hostinger hPanel nếu muốn dự phòng thêm ngoài GitHub Actions.
+6. Tìm cách deploy khác cho các plugin (SSH hiện không dùng được do bị chặn an toàn) — hoặc chấp
+   nhận quy trình thủ công qua hPanel File Manager cho các lần cập nhật code sau này.
 
 ---
 
