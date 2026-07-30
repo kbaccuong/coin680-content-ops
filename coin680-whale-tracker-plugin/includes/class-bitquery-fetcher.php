@@ -71,8 +71,10 @@ class Coin680Bitquery_Fetcher {
             KEY amount_usd (amount_usd)
         ) $charset_collate;");
 
+        // Every 2 min as of 2026-07-30 (was 5 min) -- see coin680whale_add_
+        // cron_interval() in the main plugin file for why.
         if (!wp_next_scheduled('coin680bitquery_poll')) {
-            wp_schedule_event(time(), 'coin680x_five_minutes', 'coin680bitquery_poll');
+            wp_schedule_event(time(), 'coin680x_two_minutes', 'coin680bitquery_poll');
         }
     }
 
@@ -333,3 +335,4 @@ class Coin680Bitquery_Fetcher {
         $wpdb->query($wpdb->prepare("UPDATE $table SET used_in_digest = 1 WHERE id IN ($placeholders)", $ids));
     }
 }
+
