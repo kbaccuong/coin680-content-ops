@@ -103,6 +103,18 @@ main { display: block; max-width: 1200px; margin: 0 auto; padding: 0 20px; }
 .c680-header-ticker { max-width: 420px; overflow: hidden; }
 .c680-header-ticker .c680-ticker-item { color: var(--c680-navy); }
 
+/* X (Twitter) follow icon in header -- always visible on every page so
+   visitors have one obvious, consistent way to find/contact us on X,
+   without depending on the footer menu being configured. */
+.c680-header-x {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 50%; background: var(--c680-navy);
+  color: #fff; flex-shrink: 0; margin-left: 12px; transition: background .2s;
+}
+.c680-header-x:hover { background: var(--c680-red); text-decoration: none; }
+.c680-footer-x { color: #cfd5de; }
+.c680-footer-x:hover { color: #fff; }
+
 /* ==========================================================================
    3. HOMEPAGE
    ========================================================================== */
