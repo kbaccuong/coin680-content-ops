@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('COIN680_VERSION', '1.3.8');
+define('COIN680_VERSION', '1.3.9');
 
 /* ==========================================================================
    Theme setup
@@ -891,24 +891,42 @@ function coin680_ws_format_watchlist_move($row) {
 const COIN680_WS_PER_PAGE = 60;
 const COIN680_WS_HOURS = 168; // 7 days of browsable history
 
+/**
+ * 15s transient cache, keyed by the exact chain/type/page combo. The
+ * underlying Bitquery data itself only changes once per 2-minute cron poll,
+ * so a 15s cache costs zero real freshness -- but it means any number of
+ * visitors polling the ~20s auto-refresh within the same 15s window share
+ * ONE database query instead of one each, which is the only meaningful
+ * traffic-driven cost of the live page (Bitquery itself is polled on a
+ * fixed cron schedule, completely decoupled from visitor count -- see
+ * coin680bitquery_poll / coin680watchlist_poll in the plugin bootstrap).
+ */
 function coin680_ws_query_signals($chain, $type, $page) {
     if (!class_exists('Coin680Bitquery_Fetcher')) {
         return array('items' => array(), 'total' => 0, 'pages' => 1, 'page' => 1);
     }
+    $page = max(1, (int) $page);
+    $cache_key = 'coin680_ws_q_' . md5($chain . '|' . $type . '|' . $page);
+    $cached = get_transient($cache_key);
+    if ($cached !== false) {
+        return $cached;
+    }
+
     $classification_map = array('buy' => 'DEX Buy', 'sell' => 'DEX Sell', 'swap' => 'DEX Swap');
     $classification = $classification_map[$type] ?? null;
-    $page = max(1, (int) $page);
     $offset = ($page - 1) * COIN680_WS_PER_PAGE;
 
     $total = Coin680Bitquery_Fetcher::count_recent(COIN680_WS_HOURS, $chain ?: null, $classification);
     $rows = Coin680Bitquery_Fetcher::get_recent(COIN680_WS_HOURS, COIN680_WS_PER_PAGE, $offset, $chain ?: null, $classification, 'tx_timestamp');
 
-    return array(
+    $result = array(
         'items' => array_map('coin680_ws_format_signal', $rows),
         'total' => $total,
         'pages' => max(1, (int) ceil($total / COIN680_WS_PER_PAGE)),
         'page'  => $page,
     );
+    set_transient($cache_key, $result, 15);
+    return $result;
 }
 
 function coin680_register_whale_signals_route() {
