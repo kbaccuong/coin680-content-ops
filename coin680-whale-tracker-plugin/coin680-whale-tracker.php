@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Coin680 Whale Tracker
- * Description: Polls Whale Alert's API (BTC/ETH/XRP/TRX/etc) and, via Etherscan's unified API, Ethereum/Polygon/Arbitrum directly (with DEX-swap detection), for large on-chain transactions -- classifies them and stores them for building narrative "whale digest" posts. Not an auto-poster on its own for the raw data; the digest composes and posts the actual tweet.
- * Version: 1.1.0
+ * Description: Polls Whale Alert's API (BTC/ETH/XRP/TRX/etc, toggleable in/out of posts) and, via Etherscan's unified API, Ethereum/Polygon/Arbitrum/BSC/Base/Optimism/Avalanche directly (with DEX-swap detection), for large on-chain transactions -- classifies them and stores them for building narrative "whale digest" posts. Not an auto-poster on its own for the raw data; the digest composes and posts the actual tweet.
+ * Version: 1.2.0
  * Author: Coin680
  * License: GPLv2 or later
  * Text Domain: coin680-whale-tracker
