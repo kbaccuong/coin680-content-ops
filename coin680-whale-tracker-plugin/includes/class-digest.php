@@ -301,22 +301,31 @@ class Coin680Whale_Digest {
         global $wpdb;
         $pool = array();
 
-        $whale_table = Coin680Whale_Fetcher::table_name();
-        $whale_rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM $whale_table WHERE used_in_digest = 0 AND tx_timestamp >= %s ORDER BY amount_usd DESC LIMIT %d",
-            $since, $limit_each
-        ));
-        foreach ($whale_rows as $row) {
-            $pool[] = (object) array(
-                'source'      => 'whale_alert',
-                'id'          => (int) $row->id,
-                'symbol'      => $row->symbol,
-                'classification' => $row->classification,
-                'amount_usd'  => (float) $row->amount_usd,
-                'chain_label' => ucfirst($row->blockchain),
-                'url'         => self::explorer_url($row->blockchain, $row->hash),
-                'raw'         => $row,
-            );
+        // Reversible switch (default ON): lets Whale Alert be pulled out of
+        // POSTS specifically without touching its data collection, in case
+        // you decide not to continue that subscription -- flip the setting
+        // back on any time with no rebuild needed.
+        $settings = get_option('coin680whale_settings', array());
+        $include_whale_alert = !isset($settings['include_whale_alert_in_digest']) || !empty($settings['include_whale_alert_in_digest']);
+
+        if ($include_whale_alert) {
+            $whale_table = Coin680Whale_Fetcher::table_name();
+            $whale_rows = $wpdb->get_results($wpdb->prepare(
+                "SELECT * FROM $whale_table WHERE used_in_digest = 0 AND tx_timestamp >= %s ORDER BY amount_usd DESC LIMIT %d",
+                $since, $limit_each
+            ));
+            foreach ($whale_rows as $row) {
+                $pool[] = (object) array(
+                    'source'      => 'whale_alert',
+                    'id'          => (int) $row->id,
+                    'symbol'      => $row->symbol,
+                    'classification' => $row->classification,
+                    'amount_usd'  => (float) $row->amount_usd,
+                    'chain_label' => ucfirst($row->blockchain),
+                    'url'         => self::explorer_url($row->blockchain, $row->hash),
+                    'raw'         => $row,
+                );
+            }
         }
 
         if (class_exists('Coin680MultiChain_Fetcher')) {
