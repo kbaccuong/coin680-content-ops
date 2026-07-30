@@ -593,7 +593,7 @@ class Coin680Whale_Digest {
             ? ((floor($hours) == $hours) ? sprintf('%d hour%s', $hours, $hours == 1 ? '' : 's') : sprintf('%.1f hours', $hours))
             : "{$minutes} min";
 
-        $header = "🐋 #COIN680 MULTICHAIN TEST (last {$window_label}):\n\n";
+        $header = "🐋 #COIN680 WHALE SIGNAL (last {$window_label}):\n\n";
         $lines = array();
         $cashtag_used = false;
         foreach ($picked as $item) {
@@ -622,7 +622,21 @@ class Coin680Whale_Digest {
      * captured -- doesn't wait for the next digest cycle. Whale Alert only
      * for now (the multichain side doesn't have its own mega-alert hook).
      */
+    // Bitcoin-only Whale Alert data produces enough $50M+ moves that
+    // breaking alerts could otherwise fire back-to-back within minutes of
+    // each other -- rate-limited to at most 1 every 30 min (per direct
+    // feedback: "dữ liệu bitcoin nhiều quá, giảm cứ 30p bắn 1 tín hiệu").
+    // A qualifying transaction that arrives inside the cooldown window is
+    // simply not posted as a breaking alert (it can still show up in the
+    // regular digest via the normal pool selection).
+    const MEGA_ALERT_COOLDOWN_MINUTES = 30;
+
     public function post_mega_alert($item) {
+        $last = get_option('coin680whale_last_mega_alert');
+        if ($last && (time() - strtotime($last)) < self::MEGA_ALERT_COOLDOWN_MINUTES * 60) {
+            return;
+        }
+
         $amount_fmt = '$' . number_format($item->amount_usd);
         $blurb = self::classification_blurb($item);
         $url = self::explorer_url($item->blockchain, $item->hash);
@@ -642,6 +656,7 @@ class Coin680Whale_Digest {
             Coin680X_Queue::add($text, '', '', current_time('mysql', true));
         }
         Coin680Whale_Fetcher::mark_used(array($item->id));
+        update_option('coin680whale_last_mega_alert', current_time('mysql', true), false);
     }
 
     public function post_daily_recap() {
