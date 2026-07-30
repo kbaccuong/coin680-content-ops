@@ -444,14 +444,24 @@ class Coin680Whale_Digest {
         return $picked;
     }
 
+    // Fallback cap (re-added 2026-07-30 per direct request): if it's been
+    // this long since the last post and MIN_COINS_TO_POST still hasn't
+    // been reached, post anyway with however many coins ARE ready (even
+    // just 1) rather than waiting indefinitely -- guarantees a post at
+    // least every ~30 min, same cadence Whale Alert-only signals used to
+    // have, while still preferring a fuller post when the data allows it.
+    const MAX_WAIT_MINUTES = 30;
+
     /**
-     * Checked every 5 min (via cron), but only actually posts once at least
-     * MIN_COINS_TO_POST distinct coins are sitting unused across BOTH
-     * sources -- no time-based trigger at all anymore. $since is the oldest
-     * still-unused transaction across both tables (i.e. effectively "since
-     * the last post"), used both to scope net_exchange_flow() and to build
-     * an honest, dynamic window label ("last 42 min") instead of a
-     * hardcoded one.
+     * Checked every 5 min (via cron). Posts once at least MIN_COINS_TO_POST
+     * distinct coins are sitting unused across BOTH sources -- OR, if fewer
+     * than that are ready, once MAX_WAIT_MINUTES has elapsed since the last
+     * post, in which case it posts with whatever coins ARE available (down
+     * to just 1) rather than waiting longer. $since is the oldest still-
+     * unused transaction across both tables (i.e. effectively "since the
+     * last post"), used both to scope net_exchange_flow() and to build an
+     * honest, dynamic window label ("last 42 min") instead of a hardcoded
+     * one.
      */
     public function maybe_post_digest() {
         global $wpdb;
@@ -474,8 +484,12 @@ class Coin680Whale_Digest {
         $since = min($since_candidates);
 
         $items = $this->select_diverse_items($since, self::MIN_COINS_TO_POST);
-        if (count($items) < self::MIN_COINS_TO_POST) {
+        if (empty($items)) {
             return;
+        }
+        $minutes_waited = (time() - strtotime($since)) / 60;
+        if (count($items) < self::MIN_COINS_TO_POST && $minutes_waited < self::MAX_WAIT_MINUTES) {
+            return; // not enough coins yet, and still within the normal wait window
         }
 
         $minutes = max(1, (int) round((time() - strtotime($since)) / 60));
