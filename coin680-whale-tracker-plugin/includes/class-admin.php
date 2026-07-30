@@ -147,13 +147,6 @@ class Coin680Whale_Admin {
             <?php if (isset($_GET['mc_test_queued'])) : ?><div class="notice notice-success"><p><?php esc_html_e('Multichain test post queued -- it will actually post to X within about 5 minutes via the X Scheduler cron.', 'coin680-whale-tracker'); ?></p></div><?php endif; ?>
             <?php if (isset($_GET['mc_test_empty'])) : ?><div class="notice notice-warning"><p><?php esc_html_e('No unused Bitquery transactions in the last 48h to build a test post from -- poll Bitquery first and try again.', 'coin680-whale-tracker'); ?></p></div><?php endif; ?>
 
-            <?php $bq_debug = get_option('coin680bitquery_debug', array()); if ($bq_debug) : ?>
-            <div class="card" style="max-width:1100px;margin-top:16px;background:#fffbe6;">
-                <h2><?php esc_html_e('Bitquery Debug (temporary -- remove once data flows normally)', 'coin680-whale-tracker'); ?></h2>
-                <pre style="white-space:pre-wrap;font-size:12px;"><?php echo esc_html(print_r($bq_debug, true)); ?></pre>
-            </div>
-            <?php endif; ?>
-
             <div class="card" style="max-width:600px;margin-top:16px;">
                 <h2><?php esc_html_e('API Settings', 'coin680-whale-tracker'); ?></h2>
                 <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
