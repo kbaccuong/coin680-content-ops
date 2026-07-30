@@ -460,7 +460,16 @@ class Coin680Whale_Digest {
         }
 
         $minutes = max(1, (int) round((time() - strtotime($since)) / 60));
-        $window_label = "{$minutes} min";
+        if ($minutes > 60) {
+            $hours = $minutes / 60;
+            // Whole hours read as "4 hours", partial ones as "4.5 hours" --
+            // never a decimal on an exact hour.
+            $window_label = (floor($hours) == $hours)
+                ? sprintf('%d hour%s', $hours, $hours == 1 ? '' : 's')
+                : sprintf('%.1f hours', $hours);
+        } else {
+            $window_label = "{$minutes} min";
+        }
 
         $text = $this->build_and_get_text($items, $since, $window_label);
 
