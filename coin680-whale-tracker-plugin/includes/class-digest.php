@@ -505,12 +505,24 @@ class Coin680Whale_Digest {
         }
         $since = min($since_candidates);
 
+        // Stored as a raw Unix timestamp (time()), NOT a MySQL datetime
+        // string -- deliberately avoids strtotime() here. A prior version
+        // stored/read this via current_time('mysql', true) + strtotime(),
+        // which depends on PHP's runtime default timezone (date.timezone)
+        // to parse the naive "YYYY-MM-DD HH:MM:SS" string back correctly.
+        // If that ini setting isn't UTC on this host (never confirmed
+        // either way), strtotime() would silently misinterpret an
+        // already-UTC string as being in the server's local zone, throwing
+        // the computed gap off by whatever that offset is -- which, if
+        // large enough, could make $minutes_waited look like it always
+        // clears MIN_INTERVAL_MINUTES immediately, exactly matching the
+        // reported symptom (posts still firing every ~5 min). Plain
+        // time() vs (int) $last_post_at has no string-parsing step at all,
+        // so no timezone can get involved.
         $last_post_at = get_option('coin680whale_last_digest_post_at');
-        // First run ever (no prior post recorded): fall back to the backlog
-        // age so it doesn't just refuse to post forever.
         $minutes_waited = $last_post_at
-            ? (time() - strtotime($last_post_at)) / 60
-            : (time() - strtotime($since)) / 60;
+            ? (time() - (int) $last_post_at) / 60
+            : (time() - strtotime($since)) / 60; // first run ever, no prior post recorded yet
         if ($minutes_waited < self::MIN_INTERVAL_MINUTES) {
             return; // too soon since the last post, no matter how much data is ready
         }
@@ -545,7 +557,7 @@ class Coin680Whale_Digest {
         }
 
         $this->mark_pool_used($items);
-        update_option('coin680whale_last_digest_post_at', current_time('mysql', true), false);
+        update_option('coin680whale_last_digest_post_at', time(), false);
     }
 
     /**
@@ -672,8 +684,13 @@ class Coin680Whale_Digest {
     const MEGA_ALERT_COOLDOWN_MINUTES = 30;
 
     public function post_mega_alert($item) {
+        // Raw Unix timestamp, not a datetime string -- see the long comment
+        // above maybe_post_digest()'s equivalent check for why strtotime()
+        // on a stored date string is unsafe here (PHP runtime timezone
+        // dependent). Dormant right now since Whale Alert polling is
+        // stopped, but fixed for correctness in case it's ever reactivated.
         $last = get_option('coin680whale_last_mega_alert');
-        if ($last && (time() - strtotime($last)) < self::MEGA_ALERT_COOLDOWN_MINUTES * 60) {
+        if ($last && (time() - (int) $last) < self::MEGA_ALERT_COOLDOWN_MINUTES * 60) {
             return;
         }
 
@@ -696,7 +713,7 @@ class Coin680Whale_Digest {
             Coin680X_Queue::add($text, '', '', current_time('mysql', true));
         }
         Coin680Whale_Fetcher::mark_used(array($item->id));
-        update_option('coin680whale_last_mega_alert', current_time('mysql', true), false);
+        update_option('coin680whale_last_mega_alert', time(), false);
     }
 
     public function post_daily_recap() {
