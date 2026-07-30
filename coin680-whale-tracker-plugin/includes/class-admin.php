@@ -95,9 +95,10 @@ class Coin680Whale_Admin {
     public function handle_multichain_test_post() {
         check_admin_referer('coin680multichain_test_post');
         if (!current_user_can('manage_options')) { wp_die('Not allowed.'); }
+        $limit = max(1, min(10, (int) ($_POST['mc_test_limit'] ?? 7)));
         $ok = false;
         if (class_exists('Coin680Whale_Digest')) {
-            $ok = Coin680Whale_Digest::instance()->post_multichain_test_digest(7);
+            $ok = Coin680Whale_Digest::instance()->post_multichain_test_digest($limit);
         }
         wp_safe_redirect(add_query_arg($ok ? 'mc_test_queued' : 'mc_test_empty', '1', admin_url('admin.php?page=coin680-whale-tracker')));
         exit;
@@ -185,7 +186,8 @@ class Coin680Whale_Admin {
                 <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block; margin-left:8px;">
                     <input type="hidden" name="action" value="coin680multichain_test_post">
                     <?php wp_nonce_field('coin680multichain_test_post'); ?>
-                    <button type="submit" class="button"><?php esc_html_e('Post Multichain Test Now (up to 7 tokens, X)', 'coin680-whale-tracker'); ?></button>
+                    <label><?php esc_html_e('Tokens:', 'coin680-whale-tracker'); ?> <input type="number" name="mc_test_limit" value="7" min="1" max="10" style="width:60px;"></label>
+                    <button type="submit" class="button"><?php esc_html_e('Post Multichain Test Now (X)', 'coin680-whale-tracker'); ?></button>
                 </form>
             </div>
 
