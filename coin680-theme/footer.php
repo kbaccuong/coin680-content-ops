@@ -21,7 +21,10 @@
                 ·
                 <a href="<?php echo esc_url(home_url('/risk-disclaimer/')); ?>"><?php esc_html_e('Risk Disclaimer', 'coin680'); ?></a>
             </p>
-            <p class="c680-footer-copy">&copy; <?php echo esc_html(gmdate('Y')); ?> Coin680. <?php esc_html_e('All rights reserved.', 'coin680'); ?></p>
+            <p class="c680-footer-copy">
+                &copy; <?php echo esc_html(gmdate('Y')); ?> Coin680. <?php esc_html_e('All rights reserved.', 'coin680'); ?>
+                · <a class="c680-footer-x" href="https://x.com/coin680" target="_blank" rel="noopener"><?php esc_html_e('Follow us on X', 'coin680'); ?></a>
+            </p>
         </div>
     </footer>
     <?php wp_footer(); ?>
