@@ -330,10 +330,20 @@ class Coin680Whale_Digest {
 
         if (class_exists('Coin680MultiChain_Fetcher')) {
             $mc_table = Coin680MultiChain_Fetcher::table_name();
-            $mc_rows = $wpdb->get_results($wpdb->prepare(
-                "SELECT * FROM $mc_table WHERE used_in_digest = 0 AND tx_timestamp >= %s ORDER BY amount_usd DESC LIMIT %d",
-                $since, $limit_each
-            ));
+            // Only pull from chains currently enabled in Coin680MultiChain_
+            // Labels::CHAINS -- otherwise old unused rows left over from a
+            // chain that's since been disabled (e.g. Polygon/Arbitrum/Base/
+            // Optimism/Avalanche, narrowed down 2026-07-30 to just Ethereum
+            // + BSC) could still leak into a new post.
+            $enabled_chains = class_exists('Coin680MultiChain_Labels') ? array_keys(Coin680MultiChain_Labels::CHAINS) : array();
+            $mc_rows = array();
+            if ($enabled_chains) {
+                $placeholders = implode(',', array_fill(0, count($enabled_chains), '%s'));
+                $mc_rows = $wpdb->get_results($wpdb->prepare(
+                    "SELECT * FROM $mc_table WHERE used_in_digest = 0 AND tx_timestamp >= %s AND chain IN ($placeholders) ORDER BY amount_usd DESC LIMIT %d",
+                    array_merge(array($since), $enabled_chains, array($limit_each))
+                ));
+            }
             foreach ($mc_rows as $row) {
                 $chain_cfg = class_exists('Coin680MultiChain_Labels') ? Coin680MultiChain_Labels::chain_config($row->chain) : null;
                 $pool[] = (object) array(
@@ -537,9 +547,14 @@ class Coin680Whale_Digest {
         }
         $mc_table = Coin680MultiChain_Fetcher::table_name();
         $since = gmdate('Y-m-d H:i:s', time() - 48 * HOUR_IN_SECONDS);
+        $enabled_chains = class_exists('Coin680MultiChain_Labels') ? array_keys(Coin680MultiChain_Labels::CHAINS) : array();
+        if (!$enabled_chains) {
+            return false;
+        }
+        $placeholders = implode(',', array_fill(0, count($enabled_chains), '%s'));
         $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM $mc_table WHERE used_in_digest = 0 AND tx_timestamp >= %s ORDER BY amount_usd DESC LIMIT 300",
-            $since
+            "SELECT * FROM $mc_table WHERE used_in_digest = 0 AND tx_timestamp >= %s AND chain IN ($placeholders) ORDER BY amount_usd DESC LIMIT 300",
+            array_merge(array($since), $enabled_chains)
         ));
         if (!$rows) {
             return false;
