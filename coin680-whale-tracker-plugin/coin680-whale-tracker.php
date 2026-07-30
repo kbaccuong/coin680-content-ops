@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Coin680 Whale Tracker
  * Description: Polls Whale Alert's API (Bitcoin only) and, via Bitquery's unified GraphQL API, Solana/BSC/Ethereum/TRON directly (with DEX-swap detection), for large on-chain transactions -- classifies them and stores them for building narrative "whale digest" posts. Not an auto-poster on its own for the raw data; the digest composes and posts the actual tweet.
- * Version: 1.3.0
+ * Version: 1.4.0
  * Author: Coin680
  * License: GPLv2 or later
  * Text Domain: coin680-whale-tracker
@@ -44,7 +44,7 @@ function coin680whale_add_cron_interval($schedules) {
 }
 add_filter('cron_schedules', 'coin680whale_add_cron_interval');
 
-const COIN680WHALE_DB_VERSION = '1.3';
+const COIN680WHALE_DB_VERSION = '1.4';
 
 function coin680whale_init() {
     Coin680Whale_Fetcher::instance();
@@ -62,10 +62,34 @@ function coin680whale_init() {
         Coin680Whale_Fetcher::create_table();
         Coin680Bitquery_Fetcher::create_table();
         coin680whale_migrate_to_bitquery();
+        coin680whale_retire_whale_alert_posting();
         update_option('coin680whale_db_version', COIN680WHALE_DB_VERSION);
     }
+
+    // Whale Alert's own automatic polling is stopped as of 1.4.0 (per
+    // direct feedback: "bài đăng từ whale_alert quá dày, bỏ luôn phần này
+    // đi, chỉ cần Bitquery là đủ") -- the class stays loaded/instantiated
+    // (admin.php still reads its table for the "last 24 hours" display and
+    // the manual "Poll Whale Alert Now" button still works if ever wanted
+    // again) but the recurring cron that captures NEW data and fires
+    // breaking mega-alerts is unscheduled here, every load, so it can never
+    // silently get re-added by some other code path re-registering it.
+    wp_clear_scheduled_hook('coin680whale_poll');
 }
 add_action('plugins_loaded', 'coin680whale_init');
+
+/**
+ * One-time migration (1.4.0): forces the "Include Whale Alert (Bitcoin) in
+ * posts?" setting off, so posts are Bitquery-only immediately -- rather
+ * than relying on the admin manually unchecking the box (belt-and-
+ * suspenders; the checkbox itself, and the ability to re-check it later,
+ * both still work exactly as before if this is ever reversed).
+ */
+function coin680whale_retire_whale_alert_posting() {
+    $settings = get_option('coin680whale_settings', array());
+    $settings['include_whale_alert_in_digest'] = 0;
+    update_option('coin680whale_settings', $settings);
+}
 
 /**
  * One-time cleanup, run once when upgrading to 1.3.0 (Bitquery migration),
