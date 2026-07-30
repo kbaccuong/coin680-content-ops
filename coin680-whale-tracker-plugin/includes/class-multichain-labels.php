@@ -8,16 +8,13 @@
  * fetcher -- we never estimate a price we can't verify, so an unmapped
  * token just doesn't get a $ figure and can't clear the threshold.
  *
- * Ethereum/Polygon/Arbitrum/BSC/Base/Optimism/Avalanche all enabled --
- * the free Etherscan tier only allowed the first three (confirmed live:
- * BSC/Base/Optimism/Avalanche returned "Free API access is not supported
- * for this chain" on that key); the other four were switched on after the
- * paid-tier upgrade. Router/stablecoin/token addresses for the newly added
- * chains are the well-known canonical ones (PancakeSwap on BSC, Uniswap V3
- * + the fixed OP-stack WETH predeploy on Base/Optimism, Trader Joe/Pangolin
- * on Avalanche) but haven't been spot-checked against a live tx yet the way
- * the original three were during the earlier debugging round -- worth
- * confirming against a block explorer after the first day of real data.
+ * Only Ethereum + BSC enabled for scanning/posting (2026-07-30, narrowed
+ * down per direct request -- ERC20 and BEP20 are what's actually needed;
+ * the other EVM chains Etherscan can reach (Polygon/Arbitrum/Base/
+ * Optimism/Avalanche) are commented out below rather than deleted, so
+ * turning them back on later is just uncommenting -- no rebuild needed.
+ * Router/stablecoin/token/price-id config for the disabled chains is left
+ * in place further down this file (harmless while unused).
  *
  * BSC also has `full_token_scan` turned on (see CHAINS['bsc']) -- BSC has
  * far too many low-cap/meme tokens to hand-maintain in TOKEN_PRICE_IDS one
@@ -40,16 +37,16 @@ class Coin680MultiChain_Labels {
             'label'           => 'Ethereum',
             'explorer'        => 'https://etherscan.io/tx/%s',
         ),
-        'polygon' => array(
-            'chainid'         => 137,
-            'label'           => 'Polygon',
-            'explorer'        => 'https://polygonscan.com/tx/%s',
-        ),
-        'arbitrum' => array(
-            'chainid'         => 42161,
-            'label'           => 'Arbitrum',
-            'explorer'        => 'https://arbiscan.io/tx/%s',
-        ),
+        // 'polygon' => array(
+        //     'chainid'         => 137,
+        //     'label'           => 'Polygon',
+        //     'explorer'        => 'https://polygonscan.com/tx/%s',
+        // ),
+        // 'arbitrum' => array(
+        //     'chainid'         => 42161,
+        //     'label'           => 'Arbitrum',
+        //     'explorer'        => 'https://arbiscan.io/tx/%s',
+        // ),
         'bsc' => array(
             'chainid'  => 56,
             'label'    => 'BSC',
@@ -65,21 +62,21 @@ class Coin680MultiChain_Labels {
             // meme-coin coverage is wanted there too.
             'full_token_scan' => true,
         ),
-        'base' => array(
-            'chainid'  => 8453,
-            'label'    => 'Base',
-            'explorer' => 'https://basescan.org/tx/%s',
-        ),
-        'optimism' => array(
-            'chainid'  => 10,
-            'label'    => 'Optimism',
-            'explorer' => 'https://optimistic.etherscan.io/tx/%s',
-        ),
-        'avalanche' => array(
-            'chainid'  => 43114,
-            'label'    => 'Avalanche',
-            'explorer' => 'https://snowtrace.io/tx/%s',
-        ),
+        // 'base' => array(
+        //     'chainid'  => 8453,
+        //     'label'    => 'Base',
+        //     'explorer' => 'https://basescan.org/tx/%s',
+        // ),
+        // 'optimism' => array(
+        //     'chainid'  => 10,
+        //     'label'    => 'Optimism',
+        //     'explorer' => 'https://optimistic.etherscan.io/tx/%s',
+        // ),
+        // 'avalanche' => array(
+        //     'chainid'  => 43114,
+        //     'label'    => 'Avalanche',
+        //     'explorer' => 'https://snowtrace.io/tx/%s',
+        // ),
     );
 
     /**
