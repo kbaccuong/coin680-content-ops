@@ -122,6 +122,18 @@ class Coin680Whale_Admin {
                     </table>
                 <?php endif; ?>
             </div>
+
+            <?php
+                $debug_scan = get_option('coin680multichain_debug', array());
+                $debug_amounts = get_option('coin680multichain_debug_amounts', array());
+            ?>
+            <div class="card" style="max-width:900px;margin-top:16px;background:#e6f3ff;">
+                <h2><?php esc_html_e('Scan + Amount Diagnostic (temporary)', 'coin680-whale-tracker'); ?></h2>
+                <p><strong>Last scan per chain (logs found per token):</strong></p>
+                <pre style="white-space:pre-wrap;background:#fff;padding:10px;"><?php echo esc_html(print_r($debug_scan, true)); ?></pre>
+                <p><strong>Biggest USD amount seen per token this run (before threshold filtering):</strong></p>
+                <pre style="white-space:pre-wrap;background:#fff;padding:10px;"><?php echo esc_html(print_r($debug_amounts, true)); ?></pre>
+            </div>
             <?php endif; ?>
 
             <div class="card" style="max-width:600px;margin-top:16px;">
