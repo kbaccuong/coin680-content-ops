@@ -13,10 +13,14 @@
  *
  * Deliberately narrower than the Whale Alert fetcher for this first
  * version: only tracks ERC-20/token transfers (via the Transfer event),
- * not native coin (ETH/MATIC) transfers -- a fast-follow, not in this
- * build. Only tokens with a known CoinGecko price mapping are considered,
- * since we never estimate a price we can't verify -- an unmapped token is
- * skipped entirely rather than shown without a $ figure.
+ * not native coin (ETH/MATIC/BNB/AVAX) transfers -- a fast-follow, not in
+ * this build. A token with no known CoinGecko price mapping is normally
+ * skipped entirely (we never estimate a price we can't verify) -- EXCEPT
+ * on chains with `full_token_scan` enabled (BSC), where discover_router_
+ * logs() finds unmapped tokens touching a known DEX router and prices
+ * them via whichever side of the swap IS mapped (a stablecoin or WBNB/
+ * WETH-class asset) instead of requiring the token itself to be
+ * pre-configured -- see process_single_transfer().
  */
 
 if (!defined('ABSPATH')) {
@@ -87,15 +91,19 @@ class Coin680MultiChain_Fetcher {
     /**
      * Two-tier threshold, same idea as the Whale Alert side: stablecoins
      * and wrapped BTC/ETH/native tokens use the higher bar (routine, high
-     * liquidity), everything else uses the lower "small token" bar so a
-     * genuinely large move in a smaller token isn't held to the same
-     * threshold as a routine USDT transfer.
+     * liquidity), everything else -- including unmapped/meme tokens
+     * discovered via discover_router_logs(), which never qualify as
+     * "major" -- uses the lower "small token" bar, so a genuinely large
+     * move in a smaller token isn't held to the same threshold as a
+     * routine USDT transfer.
      */
-    private function threshold($price_id) {
+    private function major_threshold() {
         $settings = get_option('coin680whale_settings', array());
-        if (Coin680MultiChain_Labels::is_major_price_id($price_id)) {
-            return isset($settings['multichain_min_value']) ? (int) $settings['multichain_min_value'] : 100000;
-        }
+        return isset($settings['multichain_min_value']) ? (int) $settings['multichain_min_value'] : 100000;
+    }
+
+    private function token_threshold() {
+        $settings = get_option('coin680whale_settings', array());
         return isset($settings['multichain_token_min_value']) ? (int) $settings['multichain_token_min_value'] : 10000;
     }
 
@@ -275,11 +283,72 @@ class Coin680MultiChain_Fetcher {
             }
         }
 
+        if (Coin680MultiChain_Labels::full_token_scan_enabled($chain)) {
+            $all_logs = array_merge($all_logs, $this->discover_router_logs($chain, $chainid, $start_block, $end_block));
+        }
+
+        // The router-discovery pass can re-fetch a log already picked up by
+        // the per-token pass above (e.g. a mapped stablecoin's own leg of a
+        // swap touches the router too) -- dedupe by (tx hash, log index)
+        // before processing so we never run the same event through
+        // process_single_transfer() twice.
         if ($all_logs) {
-            $this->process_logs($chain, $chainid, $all_logs);
+            $seen = array();
+            $deduped = array();
+            foreach ($all_logs as $log) {
+                $key = $log['transactionHash'] . ':' . $log['logIndex'];
+                if (isset($seen[$key])) {
+                    continue;
+                }
+                $seen[$key] = true;
+                $deduped[] = $log;
+            }
+            $this->process_logs($chain, $chainid, $deduped);
         }
 
         update_option($last_block_opt, $end_block);
+    }
+
+    /**
+     * Finds Transfer events for ANY token (mapped in TOKEN_PRICE_IDS or
+     * not) that touch a known DEX router, by filtering getLogs on
+     * topic1/topic2 (the indexed from/to addresses of the Transfer event)
+     * instead of on a specific token contract's `address`. This is what
+     * lets BSC's huge population of low-cap/meme tokens get tracked
+     * without adding each one by hand -- process_single_transfer() then
+     * prices an unmapped token via whichever side of the swap IS mapped.
+     * Paginated (Etherscan caps a single getLogs call's results) with a
+     * safety cap of 3 pages/3000 rows per router per direction, so a very
+     * busy catch-up window degrades to "recent activity only" rather than
+     * a runaway request.
+     */
+    private function discover_router_logs($chain, $chainid, $start_block, $end_block) {
+        $routers = array_keys(Coin680MultiChain_Labels::DEX_ROUTERS[$chain] ?? array());
+        $all_logs = array();
+        foreach ($routers as $router) {
+            $padded = '0x' . str_pad(strtolower(substr($router, 2)), 64, '0', STR_PAD_LEFT);
+            // topic1 = Transfer's indexed `from` (router sending out = a
+            // buy), topic2 = indexed `to` (router receiving = a sell).
+            foreach (array('topic1', 'topic2') as $topic_key) {
+                $page = 1;
+                do {
+                    $logs = $this->rpc($chainid, array(
+                        'module' => 'logs', 'action' => 'getLogs',
+                        'fromBlock' => $start_block, 'toBlock' => $end_block,
+                        'topic0' => Coin680MultiChain_Labels::TRANSFER_TOPIC,
+                        $topic_key => $padded,
+                        'topic0_' . substr($topic_key, -1) . '_opr' => 'and',
+                        'page' => $page, 'offset' => 1000,
+                    ));
+                    $count = is_array($logs) ? count($logs) : 0;
+                    if ($count) {
+                        $all_logs = array_merge($all_logs, $logs);
+                    }
+                    $page++;
+                } while ($count === 1000 && $page <= 3);
+            }
+        }
+        return $all_logs;
     }
 
     private function process_logs($chain, $chainid, $logs) {
@@ -304,10 +373,6 @@ class Coin680MultiChain_Fetcher {
     private function process_single_transfer($chain, $chainid, $log, $tx_logs, $table, $wpdb) {
         $token_address = $log['address'];
         $price_id = Coin680MultiChain_Labels::price_id($chain, $token_address);
-        if (!$price_id) {
-            return; // unpriced token -- skip rather than guess
-        }
-        $threshold = $this->threshold($price_id);
 
         $topics = $log['topics'];
         if (count($topics) < 3) {
@@ -322,26 +387,17 @@ class Coin680MultiChain_Fetcher {
 
         $meta = $this->token_meta($chain, $chainid, $token_address);
         $amount = $raw_amount / (10 ** $meta['decimals']);
-        $price = $this->current_price($price_id);
-
-        if (!$price) {
-            return;
-        }
-        $amount_usd = $amount * $price;
-        if ($amount_usd < $threshold) {
-            return;
-        }
 
         $dex_from = Coin680MultiChain_Labels::is_dex_router($chain, $from);
         $dex_to = Coin680MultiChain_Labels::is_dex_router($chain, $to);
         $dex_name = $dex_from ?: $dex_to;
-        $classification = 'Wallet Transfer';
-        $counter_symbol = '';
 
+        // Find the OTHER leg of this swap once, up front -- a different
+        // token contract touching the same router in the same tx. Used
+        // both to price an unmapped token (below) and to decide Buy/Sell
+        // vs generic Swap classification later.
+        $other_leg = null;
         if ($dex_name) {
-            // Look for the OTHER leg of this swap: a different token
-            // touching the same router/pool in the same transaction.
-            $other_leg = null;
             foreach ($tx_logs as $other) {
                 if ($other['address'] === $log['address']) {
                     continue;
@@ -357,27 +413,79 @@ class Coin680MultiChain_Fetcher {
                     break;
                 }
             }
+        }
 
-            $this_is_stable = Coin680MultiChain_Labels::is_stablecoin($chain, $token_address);
+        $amount_usd = 0;
+        $is_major = false;
+        $counter_symbol = '';
 
-            if ($this_is_stable && $other_leg) {
-                $other_is_stable_check = Coin680MultiChain_Labels::is_stablecoin($chain, $other_leg['address']);
-                if (!$other_is_stable_check) {
-                    // This is the cash leg of a swap -- the other leg (the
-                    // actual token being bought/sold) gets its own pass
-                    // through process_single_transfer() with proper
-                    // Buy/Sell semantics, so skip the stablecoin side here
-                    // entirely rather than recording the same swap twice.
+        if ($price_id) {
+            // Known/mapped token -- price it directly from our own
+            // CoinGecko feed, same as before.
+            $price = $this->current_price($price_id);
+            if (!$price) {
+                return;
+            }
+            $amount_usd = $amount * $price;
+            $is_major = Coin680MultiChain_Labels::is_major_price_id($price_id);
+
+            // If THIS leg is a numeraire (stablecoin or WBNB/WETH-class
+            // asset) paired against something that ISN'T also a numeraire,
+            // this is the "cash" side of a clean swap -- the other
+            // (genuinely volatile) leg gets its own pass with proper
+            // Buy/Sell semantics, so skip recording this side entirely
+            // rather than double-counting the same swap as two events.
+            if ($is_major && $other_leg) {
+                $other_price_id = Coin680MultiChain_Labels::price_id($chain, $other_leg['address']);
+                $other_is_numeraire = $other_price_id && Coin680MultiChain_Labels::is_major_price_id($other_price_id);
+                if (!$other_is_numeraire) {
                     return;
                 }
             }
+        } elseif ($dex_name && $other_leg) {
+            // Unmapped token (no CoinGecko id on file -- this is the path
+            // that lets BSC's huge population of low-cap/meme tokens get
+            // tracked without hand-adding each one) touching a known DEX
+            // router: price it via whichever side of the swap IS mapped,
+            // rather than guessing a per-token price ourselves. If the
+            // other leg isn't priced either (two unmapped tokens swapped
+            // directly), there's nothing reliable to value this against.
+            $other_price_id = Coin680MultiChain_Labels::price_id($chain, $other_leg['address']);
+            if ($other_price_id) {
+                $other_price = $this->current_price($other_price_id);
+                if ($other_price) {
+                    $other_meta = $this->token_meta($chain, $chainid, $other_leg['address']);
+                    $other_raw = hexdec($other_leg['data']);
+                    $other_amount = $other_raw / (10 ** $other_meta['decimals']);
+                    $amount_usd = $other_amount * $other_price;
+                    $counter_symbol = $other_meta['symbol'];
+                }
+            }
+            $is_major = false; // unmapped tokens always sit in the "small token" tier
+        }
 
+        if ($amount_usd <= 0) {
+            return; // nothing reliable to price this transfer against -- never guess
+        }
+
+        $threshold = $is_major ? $this->major_threshold() : $this->token_threshold();
+        if ($amount_usd < $threshold) {
+            return;
+        }
+
+        $classification = 'Wallet Transfer';
+
+        if ($dex_name) {
             if ($other_leg) {
-                $other_meta = $this->token_meta($chain, $chainid, $other_leg['address']);
-                $counter_symbol = $other_meta['symbol'];
-                $other_is_stable = Coin680MultiChain_Labels::is_stablecoin($chain, $other_leg['address']);
+                if (!$counter_symbol) {
+                    $other_meta = $this->token_meta($chain, $chainid, $other_leg['address']);
+                    $counter_symbol = $other_meta['symbol'];
+                }
+                $this_is_numeraire = $price_id && Coin680MultiChain_Labels::is_major_price_id($price_id);
+                $other_price_id_for_class = Coin680MultiChain_Labels::price_id($chain, $other_leg['address']);
+                $other_is_numeraire = $other_price_id_for_class && Coin680MultiChain_Labels::is_major_price_id($other_price_id_for_class);
 
-                if (!$this_is_stable && $other_is_stable) {
+                if (!$this_is_numeraire && $other_is_numeraire) {
                     // This (volatile) token's own direction relative to the
                     // router says whether it was bought or sold -- arriving
                     // FROM the router/pool is a buy, leaving TO it is a sell.
