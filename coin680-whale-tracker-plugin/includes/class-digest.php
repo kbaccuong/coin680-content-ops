@@ -29,6 +29,15 @@ class Coin680Whale_Digest {
     private static $instance = null;
     const MIN_COINS_TO_POST = 3;
 
+    // Cap on how many coins a SINGLE post can show (added 2026-07-30, per
+    // direct request: "nếu nhiều token quá thì tổng hợp thành 1 bài"). When
+    // the backlog has more than MIN_COINS_TO_POST qualifying coins waiting
+    // (common on busy Solana/BSC windows), one post consolidates up to this
+    // many instead of only ever showing 3 and leaving the rest queued for
+    // future posts -- this also naturally slows the POSTING RATE, since
+    // each post now clears a bigger chunk of the backlog at once.
+    const MAX_COINS_PER_POST = 7;
+
     public static function instance() {
         if (self::$instance === null) {
             self::$instance = new self();
@@ -457,16 +466,24 @@ class Coin680Whale_Digest {
 
     /**
      * Checked every 5 min (via cron). Never posts before MIN_INTERVAL_
-     * MINUTES have passed since the last post, no matter how much data is
-     * ready. Once that floor clears, posts as soon as MIN_COINS_TO_POST
-     * distinct coins are sitting unused across BOTH sources -- OR, if fewer
-     * than that are ready, once MAX_WAIT_MINUTES has elapsed since the last
-     * post, in which case it posts with whatever coins ARE available (down
-     * to just 1) rather than waiting longer. $since is the oldest still-
-     * unused transaction across both tables (i.e. effectively "since the
-     * last post"), used both to scope net_exchange_flow() and to build an
-     * honest, dynamic window label ("last 42 min") instead of a hardcoded
-     * one.
+     * MINUTES have passed since the LAST ACTUAL POST (tracked in the
+     * 'coin680whale_last_digest_post_at' option -- fixed 2026-07-30: an
+     * earlier version measured this from the OLDEST still-unused backlog
+     * row instead, which broke the 30-min floor entirely once the backlog
+     * grew past MAX_COINS_PER_POST per cycle -- rows left over from
+     * previous cycles were already "old", so the very next 5-min check
+     * always saw more than 30 minutes elapsed and posted again immediately.
+     * A dedicated last-post-time option can't be fooled by backlog size).
+     * Once that floor clears, posts as soon as MIN_COINS_TO_POST distinct
+     * coins are sitting unused across BOTH sources (showing up to
+     * MAX_COINS_PER_POST if more are ready, consolidating a big backlog
+     * into one fuller post instead of several thin ones) -- OR, if fewer
+     * than MIN_COINS_TO_POST are ready, once MAX_WAIT_MINUTES has elapsed,
+     * in which case it posts with whatever coins ARE available (down to
+     * just 1) rather than waiting longer. $since (oldest still-unused
+     * transaction) is kept purely for the descriptive "last 42 min" window
+     * label and to scope net_exchange_flow() -- it no longer drives the
+     * posting-cadence decision itself.
      */
     public function maybe_post_digest() {
         global $wpdb;
@@ -488,12 +505,17 @@ class Coin680Whale_Digest {
         }
         $since = min($since_candidates);
 
-        $minutes_waited = (time() - strtotime($since)) / 60;
+        $last_post_at = get_option('coin680whale_last_digest_post_at');
+        // First run ever (no prior post recorded): fall back to the backlog
+        // age so it doesn't just refuse to post forever.
+        $minutes_waited = $last_post_at
+            ? (time() - strtotime($last_post_at)) / 60
+            : (time() - strtotime($since)) / 60;
         if ($minutes_waited < self::MIN_INTERVAL_MINUTES) {
             return; // too soon since the last post, no matter how much data is ready
         }
 
-        $items = $this->select_diverse_items($since, self::MIN_COINS_TO_POST);
+        $items = $this->select_diverse_items($since, self::MAX_COINS_PER_POST);
         if (empty($items)) {
             return;
         }
@@ -523,6 +545,7 @@ class Coin680Whale_Digest {
         }
 
         $this->mark_pool_used($items);
+        update_option('coin680whale_last_digest_post_at', current_time('mysql', true), false);
     }
 
     /**
