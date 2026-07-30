@@ -23,6 +23,7 @@ class Coin680Whale_Admin {
         add_action('admin_post_coin680whale_save_settings', array($this, 'handle_save_settings'));
         add_action('admin_post_coin680whale_mark_used', array($this, 'handle_mark_used'));
         add_action('admin_post_coin680whale_poll_now', array($this, 'handle_poll_now'));
+        add_action('admin_post_coin680multichain_poll_now', array($this, 'handle_multichain_poll_now'));
     }
 
     public function add_menu() {
@@ -41,10 +42,12 @@ class Coin680Whale_Admin {
         check_admin_referer('coin680whale_save_settings');
         if (!current_user_can('manage_options')) { wp_die('Not allowed.'); }
         $settings = array(
-            'api_key'           => sanitize_text_field(wp_unslash($_POST['api_key'] ?? '')),
-            'min_value'         => max(10000, (int) ($_POST['min_value'] ?? 500000)),
-            'altcoin_min_value' => max(100000, (int) ($_POST['altcoin_min_value'] ?? 100000)),
-            'mega_threshold'    => max(1000000, (int) ($_POST['mega_threshold'] ?? 50000000)),
+            'api_key'              => sanitize_text_field(wp_unslash($_POST['api_key'] ?? '')),
+            'min_value'            => max(10000, (int) ($_POST['min_value'] ?? 500000)),
+            'altcoin_min_value'    => max(100000, (int) ($_POST['altcoin_min_value'] ?? 100000)),
+            'mega_threshold'       => max(1000000, (int) ($_POST['mega_threshold'] ?? 50000000)),
+            'etherscan_api_key'    => sanitize_text_field(wp_unslash($_POST['etherscan_api_key'] ?? '')),
+            'multichain_min_value' => max(50000, (int) ($_POST['multichain_min_value'] ?? 100000)),
         );
         update_option('coin680whale_settings', $settings);
         wp_safe_redirect(add_query_arg('saved', '1', admin_url('admin.php?page=coin680-whale-tracker')));
@@ -68,6 +71,16 @@ class Coin680Whale_Admin {
         exit;
     }
 
+    public function handle_multichain_poll_now() {
+        check_admin_referer('coin680multichain_poll_now');
+        if (!current_user_can('manage_options')) { wp_die('Not allowed.'); }
+        if (class_exists('Coin680MultiChain_Fetcher')) {
+            Coin680MultiChain_Fetcher::instance()->poll();
+        }
+        wp_safe_redirect(add_query_arg('mc_polled', '1', admin_url('admin.php?page=coin680-whale-tracker')));
+        exit;
+    }
+
     public function render_page() {
         if (!current_user_can('manage_options')) { return; }
         $settings = get_option('coin680whale_settings', array());
@@ -79,6 +92,7 @@ class Coin680Whale_Admin {
 
             <?php if (isset($_GET['saved'])) : ?><div class="notice notice-success"><p><?php esc_html_e('Settings saved.', 'coin680-whale-tracker'); ?></p></div><?php endif; ?>
             <?php if (isset($_GET['polled'])) : ?><div class="notice notice-success"><p><?php esc_html_e('Polled Whale Alert.', 'coin680-whale-tracker'); ?></p></div><?php endif; ?>
+            <?php if (isset($_GET['mc_polled'])) : ?><div class="notice notice-success"><p><?php esc_html_e('Polled multichain (Etherscan).', 'coin680-whale-tracker'); ?></p></div><?php endif; ?>
 
             <div class="card" style="max-width:600px;margin-top:16px;">
                 <h2><?php esc_html_e('Whale Alert API Settings', 'coin680-whale-tracker'); ?></h2>
@@ -90,15 +104,23 @@ class Coin680Whale_Admin {
                         <tr><th><?php esc_html_e('Minimum USD value to track -- BTC / ETH / USDT / USDC', 'coin680-whale-tracker'); ?></th><td><input type="number" name="min_value" min="10000" step="10000" value="<?php echo esc_attr($settings['min_value'] ?? 500000); ?>"></td></tr>
                         <tr><th><?php esc_html_e('Minimum USD value to track -- everything else (altcoins)', 'coin680-whale-tracker'); ?></th><td><input type="number" name="altcoin_min_value" min="100000" step="10000" value="<?php echo esc_attr($settings['altcoin_min_value'] ?? 100000); ?>"> <p class="description"><?php esc_html_e('Lower than the major-coin threshold on purpose -- BTC/ETH/USDT/USDC alone produce plenty of $500k+ moves, so a lower bar here is what actually gets altcoins featured. $100k is the lowest this Whale Alert API plan allows.', 'coin680-whale-tracker'); ?></p></td></tr>
                         <tr><th><?php esc_html_e('Mega-transaction breaking alert threshold (USD)', 'coin680-whale-tracker'); ?></th><td><input type="number" name="mega_threshold" min="1000000" step="1000000" value="<?php echo esc_attr($settings['mega_threshold'] ?? 50000000); ?>"></td></tr>
+                        <tr><th colspan="2"><hr></th></tr>
+                        <tr><th><?php esc_html_e('Etherscan API Key (unified V2 -- Ethereum/Polygon/Arbitrum now, more chains once upgraded)', 'coin680-whale-tracker'); ?></th><td><input type="text" name="etherscan_api_key" style="width:100%;" value="<?php echo esc_attr($settings['etherscan_api_key'] ?? ''); ?>"></td></tr>
+                        <tr><th><?php esc_html_e('Minimum USD value to track -- multichain (Ethereum/Polygon/Arbitrum)', 'coin680-whale-tracker'); ?></th><td><input type="number" name="multichain_min_value" min="50000" step="10000" value="<?php echo esc_attr($settings['multichain_min_value'] ?? 100000); ?>"></td></tr>
                     </table>
                     <p>
                         <button type="submit" class="button button-primary"><?php esc_html_e('Save Settings', 'coin680-whale-tracker'); ?></button>
                     </p>
                 </form>
-                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;">
                     <input type="hidden" name="action" value="coin680whale_poll_now">
                     <?php wp_nonce_field('coin680whale_poll_now'); ?>
                     <button type="submit" class="button"><?php esc_html_e('Poll Whale Alert Now', 'coin680-whale-tracker'); ?></button>
+                </form>
+                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block; margin-left:8px;">
+                    <input type="hidden" name="action" value="coin680multichain_poll_now">
+                    <?php wp_nonce_field('coin680multichain_poll_now'); ?>
+                    <button type="submit" class="button"><?php esc_html_e('Poll Multichain (Etherscan) Now', 'coin680-whale-tracker'); ?></button>
                 </form>
             </div>
 
@@ -139,6 +161,43 @@ class Coin680Whale_Admin {
                     <p><button type="submit" class="button"><?php esc_html_e('Mark Selected as Used in a Digest', 'coin680-whale-tracker'); ?></button></p>
                 </form>
             </div>
+
+            <?php if (class_exists('Coin680MultiChain_Fetcher')) :
+                $mc_items = Coin680MultiChain_Fetcher::get_recent(24, 100);
+            ?>
+            <div class="card" style="max-width:1100px;margin-top:16px;">
+                <h2><?php esc_html_e('Multichain (Ethereum/Polygon/Arbitrum) -- Last 24 Hours', 'coin680-whale-tracker'); ?></h2>
+                <table class="widefat striped">
+                    <thead><tr>
+                        <th><?php esc_html_e('Time (UTC)', 'coin680-whale-tracker'); ?></th>
+                        <th><?php esc_html_e('Chain / Symbol', 'coin680-whale-tracker'); ?></th>
+                        <th><?php esc_html_e('Classification', 'coin680-whale-tracker'); ?></th>
+                        <th><?php esc_html_e('DEX / Exchange', 'coin680-whale-tracker'); ?></th>
+                        <th><?php esc_html_e('From', 'coin680-whale-tracker'); ?></th>
+                        <th><?php esc_html_e('To', 'coin680-whale-tracker'); ?></th>
+                        <th><?php esc_html_e('Amount (USD)', 'coin680-whale-tracker'); ?></th>
+                        <th><?php esc_html_e('Used?', 'coin680-whale-tracker'); ?></th>
+                    </tr></thead>
+                    <tbody>
+                    <?php foreach ($mc_items as $item) : ?>
+                        <tr style="<?php echo $item->used_in_digest ? 'opacity:.5;' : ''; ?>">
+                            <td><?php echo esc_html($item->tx_timestamp); ?></td>
+                            <td><?php echo esc_html(strtoupper($item->symbol)); ?> <small>(<?php echo esc_html(ucfirst($item->chain)); ?>)</small></td>
+                            <td><strong><?php echo esc_html($item->classification); ?></strong><?php echo $item->counter_symbol ? ' <small>vs ' . esc_html($item->counter_symbol) . '</small>' : ''; ?></td>
+                            <td><?php echo esc_html($item->dex_name); ?></td>
+                            <td><small><?php echo esc_html($item->from_owner !== 'unknown' ? $item->from_owner : substr($item->from_address, 0, 10) . '...'); ?></small></td>
+                            <td><small><?php echo esc_html($item->to_owner !== 'unknown' ? $item->to_owner : substr($item->to_address, 0, 10) . '...'); ?></small></td>
+                            <td>$<?php echo esc_html(number_format($item->amount_usd)); ?></td>
+                            <td><?php echo $item->used_in_digest ? '✓' : ''; ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($mc_items)) : ?>
+                        <tr><td colspan="8"><?php esc_html_e('No multichain transactions tracked yet -- add an Etherscan API key above and click "Poll Multichain (Etherscan) Now".', 'coin680-whale-tracker'); ?></td></tr>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php endif; ?>
         </div>
         <?php
     }
