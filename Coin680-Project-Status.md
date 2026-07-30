@@ -30,7 +30,8 @@ Policy, và trong JSON-LD (`author`: Person "Mr Whale", `publisher`: Organizatio
 | GitHub | Repo private `kbaccuong/coin680-content-ops` — chứa toàn bộ doc + source code plugin/theme, dùng GitHub Contents API để đẩy file (không có git/gh CLI local) |
 | GitHub Actions | `.github/workflows/wp-cron-trigger.yml` — tự gọi `wp-cron.php` mỗi 5 phút, đảm bảo mọi cron job WordPress chạy đúng giờ dù web không có traffic |
 | X (Twitter) | Tài khoản `@coin680`, gói **Premium**. Credentials (Consumer Key/Secret, Access Token/Secret) đã lưu trong wp_options `coin680x_settings` — không cần nhập lại |
-| Whale Alert API | Key đã lưu trong wp_options `coin680whale_settings` — không cần nhập lại |
+| Whale Alert API | Key đã lưu trong wp_options `coin680whale_settings` — không cần nhập lại (chỉ còn dùng cho Bitcoin từ 2026-07-30) |
+| Bitquery API | Access token (dạng `ory_at_...`) đã lưu trong wp_options `coin680whale_settings['bitquery_access_token']` — dùng cho Solana/BSC/Ethereum/TRON, xem mục 4.3.1 |
 | Gemini API | Model `gemini-2.5-flash-image` — dùng tạo ảnh minh hoạ, gọi trực tiếp qua HTTPS, key lưu ở scratchpad khi cần |
 
 ---
@@ -77,183 +78,95 @@ sửa: ép `utf8mb4` ngay trong câu lệnh `CREATE TABLE`, thêm `ALTER TABLE .
 SET utf8mb4` chạy 1 lần cho site đang hoạt động (vì `dbDelta()` không tự đổi charset bảng đã tồn
 tại), gắn với bump `COIN680X_DB_VERSION = '1.0.1'` để tự chạy lại mà không cần tắt/bật lại plugin.
 
-### 4.3. Coin680 Whale Tracker — "Whale Signal" tự động
+### 4.3. Coin680 Whale Tracker — "Whale Signal" tự động (Bitcoin only từ 2026-07-30)
 Gọi API Whale Alert (v1 REST, `api.whale-alert.io`), tự phân loại giao dịch (Exchange
 Inflow/Outflow/to-Exchange, Mint, Burn, Wallet Transfer) dựa theo nhãn owner_type thật của Whale
 Alert — **có nêu tên sàn cụ thể khi Whale Alert gắn nhãn** (vd "moved from Binance to Coinbase").
 
-Tính năng:
-- **KHÔNG còn mốc thời gian cố định** (đổi 2026-07-29 tối, thay cho "tối đa 30 phút/bài" trước đó
-  theo yêu cầu ban đầu) — giờ **chỉ đăng khi gom đủ 3 coin khác nhau** (không quan tâm mất bao lâu),
-  ưu tiên nội dung phong phú hơn tần suất cố định. Vẫn kiểm tra mỗi 5 phút qua cron, nhưng chỉ thực
-  sự đăng khi đủ điều kiện. Tiêu đề bài tự tính đúng khoảng thời gian thực tế (vd "last 47 min"),
-  và **tự đổi sang giờ khi >60 phút** (vd "last 4 hours", "last 4.5 hours" — sửa 2026-07-30 theo
-  phản hồi, trước đó hiển thị nguyên phút kiểu "last 1137 min" khó đọc).
-- **Bật/tắt Whale Alert khỏi bài đăng** (thêm 2026-07-30) — checkbox riêng ở trang admin
-  (`include_whale_alert_in_digest`, mặc định BẬT). Lý do: user đang dùng thử Whale Alert 7 ngày
-  (còn 1 ngày quyết định lúc thêm tính năng này) — tắt checkbox này khiến bài đăng chỉ lấy dữ liệu
-  từ Multichain/Etherscan, nhưng Whale Alert **vẫn tiếp tục thu thập dữ liệu nền** (không tắt
-  hẳn code) — nếu ngừng gói Whale Alert trả phí, chỉ cần bật lại checkbox, không cần xây lại từ
-  đầu. Lưu ý: BTC/XRP/TRON/Solana không phải chain EVM, Etherscan (dù trả phí) không bao giờ phủ
-  được các chain này — tắt Whale Alert nghĩa là mất hẳn các coin đó khỏi bài đăng.
-- **Chọn đa dạng COIN trước, loại giao dịch sau, KHÔNG BAO GIỜ trùng coin trong 1 bài** (sửa
-  2026-07-29 tối, 2 lần — lần đầu còn bug để lọt trùng coin ở bước lấp chỗ trống, đã vá) — lấy giao
-  dịch lớn nhất của MỖI coin khác nhau trong pool (tối đa 60 giao dịch top theo USD), tối đa
-  **3 coin/bài** (hạ từ 6→3 ngày 30/07 theo yêu cầu — đăng thường xuyên hơn), không đủ 3 thì đăng
-  ít hơn chứ không lặp coin để lấp đầy. Lý do: BTC/ETH/USDT/USDC
-  luôn có nhiều giao dịch >$500k hơn hẳn altcoin trong bất kỳ khung giờ nào, nên nếu chỉ ưu tiên
-  theo classification hoặc size thô, các coin lớn sẽ chiếm hết chỗ, altcoin dù đủ điều kiện cũng
-  không bao giờ được đăng. Người dùng phản hồi thấy dữ liệu "nhàm chán, chỉ toàn BTC/USDT/ETH"
-  trước khi sửa.
-- **Ngưỡng USD tách riêng theo nhóm coin** (thêm 2026-07-29 tối, hạ xuống $100k ngày 30/07): BTC/
-  ETH/USDT/USDC dùng ngưỡng `min_value` (mặc định $500k), **mọi coin khác dùng ngưỡng
-  `altcoin_min_value` = $100k** — đây là **mức sàn cứng của chính API Whale Alert** (đã test trực
-  tiếp: gọi API với ngưỡng thấp hơn bị chính Whale Alert từ chối "value out of range"), không phải
-  do code tự giới hạn — không thể hạ thấp hơn được nữa với gói Whale Alert hiện tại. Whale Alert
-  API chỉ nhận 1 `min_value` toàn cục nên code luôn gọi API ở ngưỡng THẤP HƠN trong 2 ngưỡng, rồi tự
-  lọc lại theo từng nhóm coin trước khi lưu vào DB. Cả 2 ngưỡng chỉnh được ở trang admin.
-- **Whale Alert KHÔNG có BSC hoặc Solana** (xác nhận qua endpoint `/status`: chỉ 15 blockchain, hầu
-  hết chain cũ — Bitcoin, Ethereum, Ripple, Tron, EOS, Stellar, NEO, Tezos, Cosmos, ICON, Hive,
-  Steem, Liquid, và "binancechain" — đây là Binance Chain cũ BEP2, KHÔNG phải BSC/BEP20 hiện tại).
-  Đây là gốc rễ của tính năng multichain mới bên dưới.
-- **Không còn poll/first-comment kèm bài** (bỏ 2026-07-29 tối, theo phản hồi trực tiếp: "đơn bị
-  spam kênh") — mỗi chu kỳ giờ chỉ đăng **1 bài duy nhất**, không có reply/poll nữa. (Bài mega
-  alert và daily recap vốn đã không có poll từ trước, không đổi.)
-- **Net Exchange Flow** thật (tổng inflow trừ outflow toàn bộ khung giờ, không chỉ 5 giao dịch hiển thị).
-- **So sánh lịch sử thật** — lưu giá BTC tại đúng thời điểm mỗi giao dịch, so sánh với giao dịch
-  tương tự trong quá khứ (không bịa tương quan).
-- **Breaking alert tức thời** cho giao dịch ≥$50M (ngưỡng chỉnh được), không chờ chu kỳ 30 phút.
-- **Daily Recap** 1 lần/ngày (tổng khối lượng, giao dịch lớn nhất, net flow 24h).
-- Mọi mã coin có `$` phía trước ($BTC, $ETH...) — nhưng chỉ 1 cái/bài vì giới hạn X.
-- Tiêu đề: `🐋 #COIN680 WHALE SIGNAL` (viết hoa), có link tx thật cho mỗi giao dịch.
-- Trang admin: **wp-admin → Whale Tracker** (cấu hình key, 2 ngưỡng min_value, mega threshold,
-  checkbox bật/tắt Whale Alert khỏi bài đăng, xem 24h gần nhất). **Đã thêm phân trang 2026-07-30**
-  (30 giao dịch/trang, nút Prev/Next) cho cả 2 bảng (Whale Alert + Multichain) — trước đó hiển thị
-  1 lần tối đa 100 dòng, quá dài theo phản hồi. Đã bỏ 2 khung debug tạm thời ("Price Feed
-  Diagnostic", "Scan + Amount Diagnostic") dùng để chẩn đoán bug thiếu altcoin — bug đã xác nhận
-  sửa xong, khung + code ghi log liên quan đã dọn sạch.
+**Thu hẹp về CHỈ Bitcoin (2026-07-30 tối)** — trước đó bao gồm cả BTC/ETH/XRP/TRX/EOS/Stellar/...;
+giờ chỉ giữ Bitcoin, các chain khác (ETH/BSC/TRON) đã chuyển hẳn sang Bitquery (xem mục 4.3.1),
+XRP/EOS/Stellar/NEO/Tezos/Cosmos/ICON/Hive/Steem/Liquid **bị bỏ hẳn, không di chuyển đi đâu**. API
+Whale Alert vẫn gọi rộng như cũ (không có filter theo blockchain đáng tin cậy), chỉ lọc bỏ non-Bitcoin
+ngay trong `poll()` trước khi lưu vào DB. **Dữ liệu non-Bitcoin cũ đã lưu trước đó cũng đã bị XOÁ**
+khỏi bảng `wp_coin680_whale_txns` (dọn dẹp 1 lần khi nâng cấp DB version lên 1.3, theo yêu cầu "xoá
+cho nhẹ").
 
-### 4.3.1. Coin680 Multichain Fetcher — Ethereum/Polygon/Arbitrum/BSC/Base/Optimism/Avalanche
-(mới 2026-07-30, mở rộng lên 7 chain cùng ngày sau khi nâng cấp gói Etherscan)
+Tính năng còn lại:
+- **Ngưỡng USD** `min_value` (mặc định $500k) cho BTC — vẫn chỉnh được ở trang admin. Ô
+  `altcoin_min_value` vẫn còn trên form nhưng không còn tác dụng thực tế (Whale Alert chỉ còn BTC) —
+  giữ lại chỉ để dễ revert nếu sau này quay lại nhiều chain qua Whale Alert.
+- **Bật/tắt Whale Alert (Bitcoin) khỏi bài đăng** — checkbox `include_whale_alert_in_digest`, mặc
+  định BẬT, không ảnh hưởng tới việc thu thập dữ liệu nền khi tắt.
+- **Breaking alert tức thời** cho giao dịch ≥$50M (ngưỡng chỉnh được).
+- **Daily Recap** 1 lần/ngày (tổng khối lượng, giao dịch lớn nhất, net flow 24h) — vẫn tính riêng
+  trên bảng Whale Alert (giờ chỉ còn dữ liệu Bitcoin).
+- Trang admin: **wp-admin → Whale Tracker**.
 
-**Lý do xây:** Whale Alert không có BSC/Solana (xem trên). User hỏi mua API riêng cho BSC (BscScan)
-— phát hiện Etherscan.io đã hợp nhất **1 API cho 60+ chain EVM** (đổi tham số `chainid`), rẻ hơn và
-gọn hơn nhiều API riêng lẻ. **Đã test trực tiếp bằng key thật của user:**
-- Gói **Free**: chỉ dùng được Ethereum (chainid=1), Polygon (137), Arbitrum (42161) — BSC (56),
-  Base (8453), Optimism (10), Avalanche (43114) báo lỗi "Free API access is not supported for this
-  chain".
-- User đồng ý build thử với 3 chain free trước (2026-07-30 sáng), sau đó **đã nâng cấp gói
-  Etherscan lên trả phí ngay trong ngày** — 4 chain còn lại (BSC/Base/Optimism/Avalanche) đã được
-  bật lên cùng ngày trong `class-multichain-labels.php::CHAINS` (không cần sửa gì ở
-  `class-multichain-fetcher.php`, class này vốn đã lặp qua `CHAINS` một cách tổng quát — đúng như
-  thiết kế ban đầu, không cần build lại từ đầu).
-- Router DEX/stablecoin/token price ID cho 4 chain mới (PancakeSwap trên BSC; Uniswap V3 + địa chỉ
-  WETH cố định kiểu OP-stack trên Base/Optimism; Trader Joe + Pangolin trên Avalanche) là các địa
-  chỉ công khai phổ biến nhất nhưng **chưa được đối chiếu trực tiếp qua 1 giao dịch thật** như 3
-  chain ban đầu từng làm lúc debug — nên soi dữ liệu vài ngày đầu (đặc biệt tên DEX/exchange hiển
-  thị trong bài đăng) để chắc chắn không bị gán nhầm.
+### 4.3.1. Coin680 Bitquery Fetcher — Solana / BSC / Ethereum / TRON (thay thế hoàn toàn Etherscan)
+(mới 2026-07-30 — xây trong ngày, thay thế ngay hệ thống Etherscan/Multichain vừa mở rộng lên 7
+chain buổi sáng cùng ngày)
 
-**File chính:**
-- `includes/class-multichain-labels.php` — cấu hình tĩnh: danh sách chain bật/tắt, địa chỉ router
-  DEX đã biết (Uniswap, SushiSwap, QuickSwap, Camelot, PancakeSwap, BaseSwap, Velodrome, Trader Joe,
-  Pangolin), địa chỉ stablecoin đã biết (dùng để đọc hướng swap mua/bán), và bảng ánh xạ token →
-  CoinGecko ID (token không có trong bảng này bị BỎ QUA hoàn toàn — không bao giờ đoán giá).
-- `includes/class-multichain-fetcher.php` — quét `eth_getLogs` **theo từng địa chỉ token riêng**
-  (không quét blanket toàn chain — sửa bug 2026-07-30: quét blanket bị USDT/USDC chiếm hết kết quả,
-  token nhỏ như UNI/LINK không bao giờ lọt vào), phân loại 3 tầng: **DEX Buy/Sell/Swap** (đối chiếu
-  router đã biết + hướng di chuyển so với router để biết mua hay bán) → **Exchange Inflow/Outflow**
-  (đối chiếu địa chỉ với dữ liệu ĐÃ CÓ NHÃN từ Whale Alert — xem bên dưới) → **Wallet Transfer**.
-  `poll()` lặp qua toàn bộ `Coin680MultiChain_Labels::CHAINS`, nên thêm/bớt chain trong tương lai chỉ
-  cần sửa file labels, không cần sửa fetcher.
+**Lý do đổi:** User muốn thêm Solana (Etherscan không bao giờ phủ được vì không phải EVM) — hỏi mua
+DEXTools trước, tôi gợi ý so sánh thêm Bitquery/Helius/Birdeye. User dán thẳng 1 API access token
+Bitquery thật vào chat, tôi **test trực tiếp bằng nhiều lệnh gọi GraphQL thật** (không đoán) và xác
+nhận:
+- ✅ **Solana** — dữ liệu thật, real-time (độ trễ vài giây)
+- ✅ **BSC** — dữ liệu thật, real-time
+- ✅ **Ethereum** — dữ liệu thật, real-time
+- ✅ **TRON** — dữ liệu thật (dùng root schema riêng `Tron`, khác nhánh `EVM`)
+- ❌ **Bitcoin** — cú pháp được chấp nhận nhưng server trả lỗi hạ tầng nội bộ ("no such host") — dịch
+  vụ Bitcoin của Bitquery **không khả dụng với gói/tài khoản này**, không rõ do gói hay do dịch vụ
+  chưa triển khai đầy đủ. Bitcoin vẫn giữ nguyên qua Whale Alert.
+- ✅ **Bitquery tự tính sẵn USD** cho mỗi giao dịch (`Trade.Buy/Sell.AmountInUSD`) và hỗ trợ lọc
+  ngay trong query (`where: {AmountInUSD: {gt: ...}}`) — **không cần tự tra giá CoinGecko như hệ
+  Etherscan cũ**, đơn giản hoá đáng kể so với kiến trúc trước.
+- ✅ **1 kết quả DEXTrades đã gộp sẵn CẢ 2 chân swap** (Buy + Sell trong cùng object) — **không cần
+  tự quét Transfer log rồi ghép cặp theo địa chỉ router** như Etherscan build cũ phải làm.
 
-**Bug đã tìm & sửa 2026-07-30 (khiến altcoin gần như không hiện, chỉ toàn USDT/USDC):**
-1. `coin680_get_crypto_prices()` mặc định chỉ lấy top 15 coin — UNI/LINK (hạng ~37/~18) bị bỏ qua vì
-   giá trả về = 0. Sửa: luôn gọi `coin680_get_crypto_prices(250)` (mức trần thật của CoinGecko).
-2. Quét `eth_getLogs` kiểu blanket (không lọc theo `address`) trả về Transfer log của MỌI token
-   ERC-20 trên chain — bị USDT/USDC chiếm gần hết kết quả (xác nhận: 1000 log USDT chỉ trong 11
-   block). Sửa: quét riêng từng địa chỉ token đã cấu hình.
-3. Khung thời gian quét thực tế khá hẹp (~2 phút/lần bấm "Poll Now" liên tục) + giao dịch UNI/LINK
-   ≥$10k vốn dĩ không nhiều (~40 lần/3 giờ mỗi coin, đo thực tế) — không phải bug, chỉ là hiếm gặp
-   trong cửa sổ quét ngắn. Khuyến nghị để cron chạy tự nhiên 30-60 phút thay vì bấm Poll Now liên
-   tục để kiểm tra.
+User xác nhận: **Bitquery làm nguồn chính cho Solana/BSC/Ethereum/TRON, Whale Alert chỉ giữ lại
+Bitcoin.** Etherscan-based Coin680MultiChain_Fetcher (mới xây + mở rộng 7 chain sáng cùng ngày)
+**bị thay thế hoàn toàn trong vài giờ** — file `class-multichain-labels.php` /
+`class-multichain-fetcher.php` vẫn còn trên đĩa (không xoá code) nhưng **không còn được require/
+gọi ở đâu nữa** — hoàn toàn dormant, có thể khôi phục bằng cách thêm lại require + instantiate nếu
+cần, không cần build lại từ đầu.
 
-**Cải tiến kèm theo trên `class-fetcher.php` (Whale Alert):** lưu thêm `from_address`/`to_address`
-thật (trước đây chỉ lưu tên chủ sở hữu, không lưu địa chỉ) — vì địa chỉ ví EVM dùng chung định dạng
-trên mọi chain, 1 ví từng được Whale Alert gắn nhãn "Binance" trên Ethereum có thể đối chiếu lại
-trên Polygon/Arbitrum/BSC/... sau này. **Chỉ tích luỹ được từ bây giờ trở đi** (không hồi cứu được
-dữ liệu cũ), và **không phải sàn nào cũng dùng chung địa chỉ giữa các chain** — chỉ bắt được một
-phần, không đầy đủ như Whale Alert tự có trên chain gốc của nó.
+**File mới:**
+- `includes/class-bitquery-labels.php` — cấu hình chain (Solana/BSC/Ethereum/TRON) + danh sách
+  SYMBOL (không phải địa chỉ contract) được coi là "numeraire" mỗi chain (stablecoin + token
+  wrapped/native gas: USDT/USDC/DAI/BUSD, WSOL/SOL, WBNB/BNB, WETH/ETH, WTRX/TRX) — dùng để phân
+  loại DEX Buy/Sell/Swap và áp ngưỡng 2 tầng, y hệt tinh thần bên Etherscan cũ nhưng đơn giản hơn
+  nhiều (so khớp symbol, không cần bảng địa chỉ contract từng chain).
+- `includes/class-bitquery-fetcher.php` — gọi GraphQL `streaming.bitquery.io/graphql`, lọc theo
+  thời gian (`since`/`till`) + ngưỡng USD ở CẢ 2 vế giao dịch (`any: [...]`, vì 1 vế có thể chưa có
+  giá nếu token quá mới/lạ). Với mỗi trade: vế nào là numeraire (stablecoin/WBNB/WETH...) thì dùng
+  làm mốc quy đổi USD, vế còn lại là "token chính" của dòng dữ liệu — DEX Buy (mua bằng
+  numeraire)/DEX Sell (bán lấy numeraire)/DEX Swap (cả 2 vế cùng là numeraire hoặc cùng không phải).
+  Bảng mới: `wp_coin680_bitquery_txns` (unique key: chain + tx_hash + `Trade.Index` — 1 tx Solana có
+  thể chứa nhiều swap leg khác nhau, đã xác nhận qua test thật).
 
-**`class-digest.php`** gộp dữ liệu từ CẢ 2 nguồn (Whale Alert + Multichain) khi chọn bài đăng —
-không trùng coin dù coin đó xuất hiện ở nhiều chain khác nhau (ưu tiên volume lớn hơn), mỗi dòng
-bài đăng ghi rõ tên chain (vd "(Ethereum)", "(BSC)"). **Có thể tắt hẳn nguồn Whale Alert khỏi việc
-CHỌN bài** qua checkbox admin (xem mục 4.3) mà không ảnh hưởng tới việc thu thập dữ liệu nền.
+**Giới hạn đã biết (MVP, chưa làm ở bản này):**
+- **Chưa có nhãn sàn CEX** (Exchange Inflow/Outflow) cho dữ liệu Bitquery — chỉ có DEX Buy/Sell/Swap.
+  Cơ chế đối chiếu địa chỉ Whale Alert từng dùng cho Etherscan (EVM) có thể làm lại cho riêng BSC/
+  Ethereum sau này; Solana/TRON dùng định dạng địa chỉ khác hẳn nên không đối chiếu được với dữ liệu
+  Whale Alert EVM.
+- Numeraire nhận diện theo **SYMBOL, không phải địa chỉ contract xác thực** — 1 token giả mạo tên
+  symbol của USDT/WBNB (không phải contract thật) về lý thuyết có thể bị nhận nhầm là "numeraire" —
+  đánh đổi lấy sự đơn giản, chưa gặp vấn đề thực tế nhưng cần biết.
+- Tham số query `since`/`till`/`any` đã test thật và hoạt động đúng qua PowerShell trước khi build,
+  nhưng **chưa test qua đúng luồng cron thật của WordPress** — cần theo dõi vài chu kỳ đầu sau khi
+  upload để chắc chắn không có lỗi ẩn (timeout ngẫu nhiên đã gặp 1 lần lúc test, có thể là tạm thời
+  phía Bitquery).
+- Rủi ro token giả/lừa đảo trên BSC (đã ghi nhận từ tính năng full-token-scan Etherscan cũ) **vẫn áp
+  dụng tương tự** cho dữ liệu Bitquery — hệ thống chỉ xác nhận có giao dịch on-chain thật với giá trị
+  USD thật, không xác minh bản thân token có phải scam hay không.
 
-**Giới hạn đã biết (còn tồn tại sau bản mở rộng 7 chain):**
-- Chỉ bắt token ERC-20/BEP-20 (Transfer event) — **chưa bắt giao dịch coin gốc** (ETH/BNB/MATIC/AVAX
-  tự thân chuyển khoản, không qua hợp đồng token) — việc này cần quét toàn bộ block, để dành làm sau.
-- Danh sách token có giá (CoinGecko) vẫn còn giới hạn theo từng chain (chủ yếu stablecoin + wrapped
-  BTC/ETH/native + 1-2 token đặc trưng mỗi chain: UNI/LINK/ARB trên EVM gốc, CAKE trên BSC, OP trên
-  Optimism...) — mở rộng dần khi thấy token nào bị bỏ qua mà muốn có.
-- `wrapped-bitcoin` và `weth` (và có thể `wmatic`/tương tự trên chain mới) đôi khi báo "NOT FOUND"
-  dù đã gọi top 250 coin — nghi ngờ CoinGecko liệt kê vốn hoá của bản wrapped riêng, thấp hơn top
-  250 — chưa điều tra kỹ, chỉ mới ghi nhận là vấn đề nhỏ còn tồn đọng.
-- Nhãn sàn CEX cho EVM chain mới **không đầy đủ bằng Whale Alert** (tự đối chiếu, không phải nhãn
-  chính thức) — DEX thì nhận diện chính xác cao (địa chỉ router cố định, công khai), riêng router
-  của 4 chain mới thêm ngày 30/07 (BSC/Base/Optimism/Avalanche) chưa được xác nhận qua giao dịch
-  thật, cần theo dõi vài ngày đầu.
-- Trang admin: cùng trang **Whale Tracker**, có ô nhập Etherscan API key + 2 ngưỡng riêng ($100k
-  major / $10k token nhỏ, chỉnh được) + nút "Poll Multichain (Etherscan) Now" + bảng xem dữ liệu 24h
-  riêng (có phân trang 30/trang từ 2026-07-30).
-
-**4.3.2. Quét "full token" trên BSC — bắt cả meme coin/vốn hoá thấp (thêm 2026-07-30)**
-
-**Lý do:** BSC có rất nhiều token meme/vốn hoá thấp mà không thể liệt kê tay từng cái vào
-`TOKEN_PRICE_IDS` (không có CoinGecko ID, hoặc có nhưng không đáng để thêm thủ công từng token một).
-User yêu cầu quét được cả các token này, không chỉ danh sách ~44 token đã cấu hình sẵn trên 7 chain.
-
-**Cách làm — quét theo ROUTER thay vì theo TOKEN, định giá qua vế đối ứng:**
-- Trước đây: chỉ quét Transfer event của những địa chỉ token đã khai báo sẵn (`address` filter trên
-  `eth_getLogs`) — token không có trong danh sách sẽ không bao giờ được thấy.
-- Giờ (chỉ bật cho BSC qua cờ `full_token_scan` trong `class-multichain-labels.php::CHAINS['bsc']`):
-  thêm bước quét bổ sung `discover_router_logs()` — lọc Transfer event theo **topic1/topic2** (địa
-  chỉ `from`/`to` được index sẵn trong sự kiện Transfer) trùng với địa chỉ router PancakeSwap, **bất
-  kể token nào phát ra sự kiện đó**. Nhờ vậy bắt được MỌI token (kể cả token mới tạo, chưa ai biết
-  đến) miễn là nó được giao dịch qua router đã biết.
-- Token bắt được theo cách này **không cần có giá CoinGecko riêng** — hệ thống định giá USD bằng
-  cách nhìn vào VẾ CÒN LẠI của giao dịch swap (2 chân: token A vào router, token B ra khỏi router,
-  cùng 1 tx): nếu vế còn lại là USDT/BUSD/USDC/DAI hoặc WBNB/WETH (đã có giá tin cậy), lấy số lượng
-  vế đó × giá của nó = giá trị USD thật của cả giao dịch. **Không đoán giá cho chính token
-  meme/vốn hoá thấp đó** — nếu cả 2 vế đều là token lạ (không vế nào có giá tham chiếu), giao dịch
-  bị bỏ qua hoàn toàn (không đoán bừa, giữ đúng nguyên tắc "không có giá xác thực thì không hiện").
-- Token meme phát hiện được luôn dùng ngưỡng "token nhỏ" ($10k mặc định, chỉnh được) — không bao
-  giờ được coi là "major".
-- **Fix kèm theo:** đổi mapping của mọi token wrapped-native (WETH, WBTC, WMATIC, WBNB, cbBTC...)
-  từ ID CoinGecko riêng của bản wrapped sang **ID của đồng gốc** (vd WETH dùng `ethereum` thay vì
-  `weth`, WBNB dùng `binancecoin` thay vì `wbnb`) — vì bản thân đồng gốc luôn chắc chắn nằm trong
-  top 250 CoinGecko, còn bản thân listing "wrapped" riêng đôi khi bị lệch hạng, gây lỗi "NOT FOUND"
-  đã ghi nhận trước đó. Tiện thể sửa luôn lỗi tồn đọng này cho cả 7 chain, không chỉ BSC.
-- **Cải tiến kèm theo:** phân loại DEX Buy/Sell giờ áp dụng cả khi vế đối ứng là WBNB/WETH (không
-  chỉ riêng stablecoin như trước) — một token vốn hoá thấp đổi lấy WBNB giờ cũng hiện đúng "DEX Buy"/
-  "DEX Sell" thay vì rơi vào "DEX Swap" chung chung (cải thiện luôn cho cả 3 chain gốc, không chỉ BSC).
-
-**Giới hạn/rủi ro cần biết (chưa qua kiểm chứng thực tế, cần theo dõi vài ngày đầu):**
-- **Tham số API `topic0_1_opr`/`topic0_2_opr` gửi cho Etherscan chưa được test trực tiếp** — đây là
-  cách chuẩn để lọc theo topic1/topic2 riêng lẻ nhưng chưa xác nhận Etherscan V2 unified API chấp
-  nhận đúng cú pháp này khi chỉ có topic1 HOẶC topic2 (không có topic1_2_opr đi kèm). **Cần bấm "Poll
-  Multichain (Etherscan) Now" và kiểm tra bảng dữ liệu BSC xem có token lạ (ngoài danh sách 8 token
-  đã biết) xuất hiện không** — nếu không thấy, có thể tham số API cần điều chỉnh lại.
-- **Rủi ro token giả/lừa đảo:** BSC nổi tiếng có nhiều token scam dùng thủ thuật giả sự kiện
-  Transfer (log sự kiện nhưng không thực sự chuyển token, hoặc token honeypot không bán lại được).
-  Hệ thống chỉ xác nhận **có 1 giao dịch swap thật trên chain với giá trị USD tính từ vế
-  USDT/WBNB thật** — không xác minh được bản thân token đó có phải lừa đảo/token rác hay không. Bài
-  đăng X có thể vô tình nhắc đến 1 token scam như thể đó là "cá voi giao dịch lớn" — nên cân nhắc
-  xem lại vài bài đầu có nhắc token BSC lạ trước khi để tự động hoàn toàn.
-- **Tăng số lượng gọi API mỗi chu kỳ quét** — thêm tối đa 4 router × 2 hướng × tối đa 3 trang = tới
-  24 lệnh gọi riêng cho BSC mỗi 5 phút (ngoài phần quét theo token đã có). Có giới hạn phân trang tối
-  đa 3 trang/lượt để tránh treo request quá lâu, nhưng nếu BSC có đợt hoạt động cao điểm, dữ liệu quá
-  3000 dòng/router/hướng trong 1 chu kỳ sẽ bị bỏ sót (chỉ ảnh hưởng lúc dồn dập, không ảnh hưởng theo
-  dõi bình thường).
+**Dọn dẹp dữ liệu đi kèm (2026-07-30, theo yêu cầu "xoá cho nhẹ"):** khi nâng version DB lên 1.3
+(tự chạy 1 lần lúc WordPress load plugin, không cần thao tác tay):
+- **`DROP TABLE`** hẳn `wp_coin680_multichain_txns` (toàn bộ dữ liệu Etherscan/EVM cũ) — bảng này
+  không còn được ghi/đọc ở đâu nữa nên xoá luôn thay vì để mồ côi.
+- **`DELETE`** mọi dòng KHÔNG PHẢI Bitcoin khỏi `wp_coin680_whale_txns` (giữ lại bảng, chỉ xoá dữ
+  liệu non-Bitcoin) — vì Whale Alert giờ chỉ còn theo dõi Bitcoin.
+- Xoá cron job cũ `coin680multichain_poll` (không còn class nào lắng nghe hook này nữa).
 
 ### 4.4. Coin680 News Monitor — quét tin tức 2 nguồn
 Tự động lấy RSS feed CoinDesk + Cointelegraph mỗi 5 phút, lưu tiêu đề/link/tóm tắt vào bảng
