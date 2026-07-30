@@ -122,7 +122,10 @@ class Coin680Whale_Fetcher {
             return;
         }
         $major_min_value = isset($settings['min_value']) ? (int) $settings['min_value'] : 500000;
-        $altcoin_min_value = isset($settings['altcoin_min_value']) ? (int) $settings['altcoin_min_value'] : 300000;
+        // $100k is the Whale Alert Developer API plan's hard floor -- the API
+        // itself rejects any min_value below that, so this default is already
+        // as low as this plan allows.
+        $altcoin_min_value = isset($settings['altcoin_min_value']) ? (int) $settings['altcoin_min_value'] : 100000;
         // Query Whale Alert at the LOWER of the two thresholds -- its API only
         // takes one global min_value, so we always fetch generously and then
         // apply the per-asset-class threshold ourselves before storing anything.
