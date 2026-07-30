@@ -250,14 +250,31 @@ class Coin680MultiChain_Fetcher {
             return;
         }
 
-        $logs = $this->rpc($chainid, array(
-            'module' => 'logs', 'action' => 'getLogs',
-            'fromBlock' => $start_block, 'toBlock' => $end_block,
-            'topic0' => Coin680MultiChain_Labels::TRANSFER_TOPIC,
-        ));
+        // Query PER TOKEN ADDRESS, not one blanket query for every Transfer
+        // event on the whole chain. A blanket topic0-only query returns
+        // Transfer logs from every ERC-20 contract on the chain -- in any
+        // real block range that's dominated overwhelmingly by USDT/USDC
+        // (thousands of transfers), so smaller tokens like UNI/LINK were
+        // getting crowded out of the (implicitly capped) result set and
+        // never seen at all, even though they genuinely had qualifying
+        // transfers in that window. Scoping each call to one contract
+        // address guarantees every tracked token actually gets checked.
+        $token_ids = Coin680MultiChain_Labels::TOKEN_PRICE_IDS[$chain] ?? array();
+        $all_logs = array();
+        foreach (array_keys($token_ids) as $token_address) {
+            $logs = $this->rpc($chainid, array(
+                'module' => 'logs', 'action' => 'getLogs',
+                'fromBlock' => $start_block, 'toBlock' => $end_block,
+                'address' => $token_address,
+                'topic0' => Coin680MultiChain_Labels::TRANSFER_TOPIC,
+            ));
+            if (is_array($logs)) {
+                $all_logs = array_merge($all_logs, $logs);
+            }
+        }
 
-        if (is_array($logs)) {
-            $this->process_logs($chain, $chainid, $logs);
+        if ($all_logs) {
+            $this->process_logs($chain, $chainid, $all_logs);
         }
 
         update_option($last_block_opt, $end_block);
