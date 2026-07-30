@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Coin680 Whale Tracker
- * Description: Polls Whale Alert's API for large on-chain transactions, classifies them (mint/burn, exchange inflow/outflow, wallet transfer), and stores them for building narrative "whale digest" posts -- not an auto-poster, just honest data collection.
- * Version: 1.0.0
+ * Description: Polls Whale Alert's API (BTC/ETH/XRP/TRX/etc) and, via Etherscan's unified API, Ethereum/Polygon/Arbitrum directly (with DEX-swap detection), for large on-chain transactions -- classifies them and stores them for building narrative "whale digest" posts. Not an auto-poster on its own for the raw data; the digest composes and posts the actual tweet.
+ * Version: 1.1.0
  * Author: Coin680
  * License: GPLv2 or later
  * Text Domain: coin680-whale-tracker
@@ -15,6 +15,8 @@ if (!defined('ABSPATH')) {
 define('COIN680WHALE_DIR', plugin_dir_path(__FILE__));
 
 require_once COIN680WHALE_DIR . 'includes/class-fetcher.php';
+require_once COIN680WHALE_DIR . 'includes/class-multichain-labels.php';
+require_once COIN680WHALE_DIR . 'includes/class-multichain-fetcher.php';
 require_once COIN680WHALE_DIR . 'includes/class-admin.php';
 require_once COIN680WHALE_DIR . 'includes/class-digest.php';
 
@@ -34,17 +36,32 @@ function coin680whale_add_cron_interval($schedules) {
 }
 add_filter('cron_schedules', 'coin680whale_add_cron_interval');
 
+const COIN680WHALE_DB_VERSION = '1.1';
+
 function coin680whale_init() {
     Coin680Whale_Fetcher::instance();
+    Coin680MultiChain_Fetcher::instance();
     Coin680Whale_Digest::instance();
     if (is_admin()) {
         Coin680Whale_Admin::instance();
+    }
+
+    // Schema upgrade path for sites where this plugin was already active
+    // before the multichain feature was added -- runs the table
+    // create/upgrade again (dbDelta is safe to re-run, it only adds what's
+    // missing) without requiring a manual deactivate/reactivate.
+    if (get_option('coin680whale_db_version') !== COIN680WHALE_DB_VERSION) {
+        Coin680Whale_Fetcher::create_table();
+        Coin680MultiChain_Fetcher::create_table();
+        update_option('coin680whale_db_version', COIN680WHALE_DB_VERSION);
     }
 }
 add_action('plugins_loaded', 'coin680whale_init');
 
 function coin680whale_activate() {
     Coin680Whale_Fetcher::create_table();
+    Coin680MultiChain_Fetcher::create_table();
+    update_option('coin680whale_db_version', COIN680WHALE_DB_VERSION);
     if (!wp_next_scheduled('coin680whale_digest_check')) {
         wp_schedule_event(time(), 'coin680x_five_minutes', 'coin680whale_digest_check');
     }
@@ -56,6 +73,7 @@ register_activation_hook(__FILE__, 'coin680whale_activate');
 
 function coin680whale_deactivate() {
     wp_clear_scheduled_hook('coin680whale_poll');
+    wp_clear_scheduled_hook('coin680multichain_poll');
     wp_clear_scheduled_hook('coin680whale_digest_check');
     wp_clear_scheduled_hook('coin680whale_daily_recap');
 }
