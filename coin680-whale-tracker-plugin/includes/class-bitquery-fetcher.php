@@ -295,33 +295,57 @@ class Coin680Bitquery_Fetcher {
         return ucwords(str_replace('_', ' ', $slug));
     }
 
-    public static function get_recent($hours = 24, $limit = 100, $offset = 0, $chain = null) {
+    /**
+     * $order_by defaults to 'amount_usd' (largest first) to keep existing
+     * callers (the admin digest-building table) unchanged -- pass
+     * 'tx_timestamp' for a chronological "live feed" ordering instead
+     * (added 2026-07-30 for the public Live Whale Signals page, where
+     * paging through history and seeing new items appear at the top only
+     * makes sense sorted by time, not size).
+     */
+    public static function get_recent($hours = 24, $limit = 100, $offset = 0, $chain = null, $classification = null, $order_by = 'amount_usd') {
         global $wpdb;
         $table = self::table_name();
         $since = gmdate('Y-m-d H:i:s', time() - $hours * HOUR_IN_SECONDS);
+        $order_col = ($order_by === 'tx_timestamp') ? 'tx_timestamp' : 'amount_usd';
+
+        $where = 'tx_timestamp >= %s';
+        $args = array($since);
         if ($chain) {
-            return $wpdb->get_results($wpdb->prepare(
-                "SELECT * FROM $table WHERE tx_timestamp >= %s AND chain = %s ORDER BY amount_usd DESC LIMIT %d OFFSET %d",
-                $since, $chain, $limit, $offset
-            ));
+            $where .= ' AND chain = %s';
+            $args[] = $chain;
         }
+        if ($classification) {
+            $where .= ' AND classification = %s';
+            $args[] = $classification;
+        }
+        $args[] = $limit;
+        $args[] = $offset;
+
         return $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM $table WHERE tx_timestamp >= %s ORDER BY amount_usd DESC LIMIT %d OFFSET %d",
-            $since, $limit, $offset
+            "SELECT * FROM $table WHERE $where ORDER BY $order_col DESC LIMIT %d OFFSET %d",
+            $args
         ));
     }
 
-    public static function count_recent($hours = 24, $chain = null) {
+    public static function count_recent($hours = 24, $chain = null, $classification = null) {
         global $wpdb;
         $table = self::table_name();
         $since = gmdate('Y-m-d H:i:s', time() - $hours * HOUR_IN_SECONDS);
+
+        $where = 'tx_timestamp >= %s';
+        $args = array($since);
         if ($chain) {
-            return (int) $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM $table WHERE tx_timestamp >= %s AND chain = %s", $since, $chain
-            ));
+            $where .= ' AND chain = %s';
+            $args[] = $chain;
         }
+        if ($classification) {
+            $where .= ' AND classification = %s';
+            $args[] = $classification;
+        }
+
         return (int) $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM $table WHERE tx_timestamp >= %s", $since
+            "SELECT COUNT(*) FROM $table WHERE $where", $args
         ));
     }
 
