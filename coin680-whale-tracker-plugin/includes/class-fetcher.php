@@ -6,6 +6,12 @@
  * everything in our own table. Writing the actual narrative digest post
  * stays a manual/reviewed step (see Coin680-News-Playbook.md) -- this
  * class only handles honest data collection.
+ *
+ * Also stores the real from/to wallet addresses (not just the owner
+ * name/type) -- since EVM address format is shared across Ethereum,
+ * Polygon, Arbitrum, BSC etc., Coin680MultiChain_Fetcher cross-references
+ * these labeled addresses to recognize the same exchange wallet reused on
+ * a different chain, without needing its own separate label database.
  */
 
 if (!defined('ABSPATH')) {
@@ -45,8 +51,10 @@ class Coin680Whale_Fetcher {
             classification VARCHAR(30) NOT NULL DEFAULT '',
             from_owner VARCHAR(100) NOT NULL DEFAULT '',
             from_owner_type VARCHAR(30) NOT NULL DEFAULT '',
+            from_address VARCHAR(100) NOT NULL DEFAULT '',
             to_owner VARCHAR(100) NOT NULL DEFAULT '',
             to_owner_type VARCHAR(30) NOT NULL DEFAULT '',
+            to_address VARCHAR(100) NOT NULL DEFAULT '',
             amount DOUBLE NOT NULL DEFAULT 0,
             amount_usd DOUBLE NOT NULL DEFAULT 0,
             btc_price_usd DOUBLE NOT NULL DEFAULT 0,
@@ -58,7 +66,9 @@ class Coin680Whale_Fetcher {
             PRIMARY KEY (id),
             UNIQUE KEY whale_alert_id (whale_alert_id),
             KEY tx_timestamp (tx_timestamp),
-            KEY amount_usd (amount_usd)
+            KEY amount_usd (amount_usd),
+            KEY from_address (from_address(42)),
+            KEY to_address (to_address(42))
         ) $charset_collate;");
 
         if (!wp_next_scheduled('coin680whale_poll')) {
@@ -171,8 +181,8 @@ class Coin680Whale_Fetcher {
             $classification = $this->classify($tx);
             $wpdb->query($wpdb->prepare(
                 "INSERT IGNORE INTO $table
-                (whale_alert_id, blockchain, symbol, transaction_type, classification, from_owner, from_owner_type, to_owner, to_owner_type, amount, amount_usd, btc_price_usd, tx_timestamp, hash, created_at)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%f,%f,%f,%s,%s,%s)",
+                (whale_alert_id, blockchain, symbol, transaction_type, classification, from_owner, from_owner_type, from_address, to_owner, to_owner_type, to_address, amount, amount_usd, btc_price_usd, tx_timestamp, hash, created_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%f,%f,%f,%s,%s,%s)",
                 $tx['id'],
                 $tx['blockchain'],
                 $tx['symbol'],
@@ -180,8 +190,10 @@ class Coin680Whale_Fetcher {
                 $classification,
                 $tx['from']['owner'] ?? 'unknown',
                 $tx['from']['owner_type'] ?? 'unknown',
+                $tx['from']['address'] ?? '',
                 $tx['to']['owner'] ?? 'unknown',
                 $tx['to']['owner_type'] ?? 'unknown',
+                $tx['to']['address'] ?? '',
                 $tx['amount'],
                 $tx['amount_usd'],
                 $btc_price,
