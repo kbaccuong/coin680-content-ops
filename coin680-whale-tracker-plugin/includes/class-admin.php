@@ -239,7 +239,7 @@ class Coin680Whale_Admin {
                 $mc_base_url = remove_query_arg(array('saved', 'polled', 'mc_polled', 'mc_page'));
             ?>
             <div class="card" style="max-width:1100px;margin-top:16px;">
-                <h2><?php esc_html_e('Multichain (Ethereum/Polygon/Arbitrum/BSC/Base/Optimism/Avalanche) -- Last 24 Hours', 'coin680-whale-tracker'); ?></h2>
+                <h2><?php esc_html_e('Multichain -- Last 24 Hours', 'coin680-whale-tracker'); ?></h2>
                 <p>
                     <strong><?php esc_html_e('Filter by chain:', 'coin680-whale-tracker'); ?></strong>
                     <a class="button <?php echo $mc_chain === '' ? 'button-primary' : ''; ?>" href="<?php echo esc_url(remove_query_arg('mc_chain', $mc_base_url)); ?>"><?php esc_html_e('All', 'coin680-whale-tracker'); ?></a>
