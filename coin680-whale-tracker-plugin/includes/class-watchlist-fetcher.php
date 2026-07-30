@@ -74,7 +74,7 @@ class Coin680Watchlist_Fetcher {
         ) $charset_collate;");
 
         if (!wp_next_scheduled('coin680watchlist_poll')) {
-            wp_schedule_event(time(), 'coin680x_two_minutes', 'coin680watchlist_poll');
+            wp_schedule_event(time(), 'coin680x_five_minutes', 'coin680watchlist_poll');
         }
     }
 
