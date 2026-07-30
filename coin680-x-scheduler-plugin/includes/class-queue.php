@@ -39,7 +39,11 @@ class Coin680X_Queue {
     public static function create_table() {
         global $wpdb;
         $table = self::table_name();
-        $charset_collate = $wpdb->get_charset_collate();
+        // Force utf8mb4 explicitly rather than trusting $wpdb->get_charset_collate()
+        // -- posts routinely contain 4-byte emoji (🐋 etc.), and a table stuck
+        // on plain "utf8" (3-byte, a common legacy default) silently mangles
+        // those into "??" on insert rather than erroring, which is exactly
+        // what was happening to the live whale-signal posts.
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         dbDelta("CREATE TABLE $table (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -55,7 +59,13 @@ class Coin680X_Queue {
             created_at DATETIME NOT NULL,
             PRIMARY KEY (id),
             KEY status_scheduled (status, scheduled_at)
-        ) $charset_collate;");
+        ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;");
+
+        // dbDelta only creates/adds columns -- it won't convert an EXISTING
+        // table's charset, so this table may still be utf8 from before this
+        // fix. Force the conversion explicitly; harmless/instant if it's
+        // already utf8mb4.
+        $wpdb->query("ALTER TABLE $table CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
 
         if (!wp_next_scheduled('coin680x_process_queue')) {
             wp_schedule_event(time(), 'coin680x_five_minutes', 'coin680x_process_queue');
