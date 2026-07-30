@@ -91,9 +91,24 @@ class Coin680Bitquery_Fetcher {
         return isset($settings['bitquery_token_min_value']) ? (int) $settings['bitquery_token_min_value'] : 10000;
     }
 
-    private function gql($query) {
+    /**
+     * Temporary debug hook (added 2026-07-30 after the admin table stayed
+     * empty even after fixing the query-brace bug) -- records the last
+     * outcome PER CHAIN (wp_error message, HTTP status, GraphQL errors
+     * array, or row count on success) so what's actually happening is
+     * visible from the admin page instead of guessed at blind. Remove
+     * once Bitquery data is confirmed flowing normally.
+     */
+    private function record_debug($chain, $info) {
+        $debug = get_option('coin680bitquery_debug', array());
+        $debug[$chain] = array_merge(array('at' => current_time('mysql', true)), $info);
+        update_option('coin680bitquery_debug', $debug, false);
+    }
+
+    private function gql($query, $chain = '') {
         $token = $this->access_token();
         if (!$token) {
+            $this->record_debug($chain, array('outcome' => 'no access token configured'));
             return null;
         }
         $response = wp_remote_post(self::ENDPOINT, array(
@@ -105,12 +120,21 @@ class Coin680Bitquery_Fetcher {
             'body' => wp_json_encode(array('query' => $query)),
         ));
         if (is_wp_error($response)) {
+            $this->record_debug($chain, array('outcome' => 'wp_error', 'message' => $response->get_error_message()));
             return null;
         }
-        $body = json_decode(wp_remote_retrieve_body($response), true);
+        $status = wp_remote_retrieve_response_code($response);
+        $raw_body = wp_remote_retrieve_body($response);
+        $body = json_decode($raw_body, true);
         if (!empty($body['errors'])) {
+            $this->record_debug($chain, array('outcome' => 'graphql_errors', 'status' => $status, 'errors' => $body['errors']));
             return null;
         }
+        if ($status !== 200) {
+            $this->record_debug($chain, array('outcome' => 'http_error', 'status' => $status, 'body' => substr($raw_body, 0, 500)));
+            return null;
+        }
+        $this->record_debug($chain, array('outcome' => 'ok', 'status' => $status));
         return $body['data'] ?? null;
     }
 
@@ -169,7 +193,7 @@ class Coin680Bitquery_Fetcher {
             $query = "{ Tron { DEXTrades(limit: {count: 200} orderBy: {descending: Block_Time} where: {Block: {Time: {since: \"{$since}\" till: \"{$now}\"}} any: [{Trade: {Buy: {AmountInUSD: {gt: \"{$min}\"}}}} {Trade: {Sell: {AmountInUSD: {gt: \"{$min}\"}}}}]}) { Transaction { Hash } Trade { {$trade_fields} } Block { Time } } } }";
         }
 
-        $data = $this->gql($query);
+        $data = $this->gql($query, $chain);
         $rows = null;
         if ($config['query_kind'] === 'solana') {
             $rows = $data['Solana']['DEXTrades'] ?? null;
@@ -179,10 +203,23 @@ class Coin680Bitquery_Fetcher {
             $rows = $data['Tron']['DEXTrades'] ?? null;
         }
 
+        $inserted = 0;
         if (is_array($rows)) {
             foreach ($rows as $row) {
                 $this->process_trade($chain, $row);
+                global $wpdb;
+                if ($wpdb->rows_affected > 0) {
+                    $inserted++;
+                }
             }
+        }
+        $debug = get_option('coin680bitquery_debug', array());
+        if (isset($debug[$chain])) {
+            $debug[$chain]['since'] = $since;
+            $debug[$chain]['till'] = $now;
+            $debug[$chain]['rows_returned'] = is_array($rows) ? count($rows) : 0;
+            $debug[$chain]['rows_inserted'] = $inserted;
+            update_option('coin680bitquery_debug', $debug, false);
         }
 
         update_option($last_opt, $now, false);
