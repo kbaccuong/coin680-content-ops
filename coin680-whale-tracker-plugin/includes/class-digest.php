@@ -440,12 +440,25 @@ class Coin680Whale_Digest {
     // this long since the last post and MIN_COINS_TO_POST still hasn't
     // been reached, post anyway with however many coins ARE ready (even
     // just 1) rather than waiting indefinitely -- guarantees a post at
-    // least every ~30 min, same cadence Whale Alert-only signals used to
-    // have, while still preferring a fuller post when the data allows it.
-    const MAX_WAIT_MINUTES = 30;
+    // least every ~50 min, while still preferring a fuller post when the
+    // data allows it.
+    const MAX_WAIT_MINUTES = 50;
+
+    // Floor on the OTHER side (added 2026-07-30, per direct feedback: the
+    // on-chain feed alone -- especially Solana/BSC via Bitquery -- can
+    // accumulate MIN_COINS_TO_POST fast enough to post every few minutes,
+    // which read as too dense/spammy. No post fires before this many
+    // minutes have passed since the last one, REGARDLESS of how much data
+    // is already sitting ready -- it just keeps accumulating in the pool
+    // until this floor clears. Combined with MAX_WAIT_MINUTES above, a
+    // post lands somewhere in the 30-50 min range depending on how fast
+    // qualifying data actually arrives, never faster, never slower.
+    const MIN_INTERVAL_MINUTES = 30;
 
     /**
-     * Checked every 5 min (via cron). Posts once at least MIN_COINS_TO_POST
+     * Checked every 5 min (via cron). Never posts before MIN_INTERVAL_
+     * MINUTES have passed since the last post, no matter how much data is
+     * ready. Once that floor clears, posts as soon as MIN_COINS_TO_POST
      * distinct coins are sitting unused across BOTH sources -- OR, if fewer
      * than that are ready, once MAX_WAIT_MINUTES has elapsed since the last
      * post, in which case it posts with whatever coins ARE available (down
@@ -475,13 +488,17 @@ class Coin680Whale_Digest {
         }
         $since = min($since_candidates);
 
+        $minutes_waited = (time() - strtotime($since)) / 60;
+        if ($minutes_waited < self::MIN_INTERVAL_MINUTES) {
+            return; // too soon since the last post, no matter how much data is ready
+        }
+
         $items = $this->select_diverse_items($since, self::MIN_COINS_TO_POST);
         if (empty($items)) {
             return;
         }
-        $minutes_waited = (time() - strtotime($since)) / 60;
         if (count($items) < self::MIN_COINS_TO_POST && $minutes_waited < self::MAX_WAIT_MINUTES) {
-            return; // not enough coins yet, and still within the normal wait window
+            return; // not enough coins yet, and still within the extended wait window
         }
 
         $minutes = max(1, (int) round((time() - strtotime($since)) / 60));
