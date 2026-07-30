@@ -206,6 +206,55 @@ CHỌN bài** qua checkbox admin (xem mục 4.3) mà không ảnh hưởng tới
   major / $10k token nhỏ, chỉnh được) + nút "Poll Multichain (Etherscan) Now" + bảng xem dữ liệu 24h
   riêng (có phân trang 30/trang từ 2026-07-30).
 
+**4.3.2. Quét "full token" trên BSC — bắt cả meme coin/vốn hoá thấp (thêm 2026-07-30)**
+
+**Lý do:** BSC có rất nhiều token meme/vốn hoá thấp mà không thể liệt kê tay từng cái vào
+`TOKEN_PRICE_IDS` (không có CoinGecko ID, hoặc có nhưng không đáng để thêm thủ công từng token một).
+User yêu cầu quét được cả các token này, không chỉ danh sách ~44 token đã cấu hình sẵn trên 7 chain.
+
+**Cách làm — quét theo ROUTER thay vì theo TOKEN, định giá qua vế đối ứng:**
+- Trước đây: chỉ quét Transfer event của những địa chỉ token đã khai báo sẵn (`address` filter trên
+  `eth_getLogs`) — token không có trong danh sách sẽ không bao giờ được thấy.
+- Giờ (chỉ bật cho BSC qua cờ `full_token_scan` trong `class-multichain-labels.php::CHAINS['bsc']`):
+  thêm bước quét bổ sung `discover_router_logs()` — lọc Transfer event theo **topic1/topic2** (địa
+  chỉ `from`/`to` được index sẵn trong sự kiện Transfer) trùng với địa chỉ router PancakeSwap, **bất
+  kể token nào phát ra sự kiện đó**. Nhờ vậy bắt được MỌI token (kể cả token mới tạo, chưa ai biết
+  đến) miễn là nó được giao dịch qua router đã biết.
+- Token bắt được theo cách này **không cần có giá CoinGecko riêng** — hệ thống định giá USD bằng
+  cách nhìn vào VẾ CÒN LẠI của giao dịch swap (2 chân: token A vào router, token B ra khỏi router,
+  cùng 1 tx): nếu vế còn lại là USDT/BUSD/USDC/DAI hoặc WBNB/WETH (đã có giá tin cậy), lấy số lượng
+  vế đó × giá của nó = giá trị USD thật của cả giao dịch. **Không đoán giá cho chính token
+  meme/vốn hoá thấp đó** — nếu cả 2 vế đều là token lạ (không vế nào có giá tham chiếu), giao dịch
+  bị bỏ qua hoàn toàn (không đoán bừa, giữ đúng nguyên tắc "không có giá xác thực thì không hiện").
+- Token meme phát hiện được luôn dùng ngưỡng "token nhỏ" ($10k mặc định, chỉnh được) — không bao
+  giờ được coi là "major".
+- **Fix kèm theo:** đổi mapping của mọi token wrapped-native (WETH, WBTC, WMATIC, WBNB, cbBTC...)
+  từ ID CoinGecko riêng của bản wrapped sang **ID của đồng gốc** (vd WETH dùng `ethereum` thay vì
+  `weth`, WBNB dùng `binancecoin` thay vì `wbnb`) — vì bản thân đồng gốc luôn chắc chắn nằm trong
+  top 250 CoinGecko, còn bản thân listing "wrapped" riêng đôi khi bị lệch hạng, gây lỗi "NOT FOUND"
+  đã ghi nhận trước đó. Tiện thể sửa luôn lỗi tồn đọng này cho cả 7 chain, không chỉ BSC.
+- **Cải tiến kèm theo:** phân loại DEX Buy/Sell giờ áp dụng cả khi vế đối ứng là WBNB/WETH (không
+  chỉ riêng stablecoin như trước) — một token vốn hoá thấp đổi lấy WBNB giờ cũng hiện đúng "DEX Buy"/
+  "DEX Sell" thay vì rơi vào "DEX Swap" chung chung (cải thiện luôn cho cả 3 chain gốc, không chỉ BSC).
+
+**Giới hạn/rủi ro cần biết (chưa qua kiểm chứng thực tế, cần theo dõi vài ngày đầu):**
+- **Tham số API `topic0_1_opr`/`topic0_2_opr` gửi cho Etherscan chưa được test trực tiếp** — đây là
+  cách chuẩn để lọc theo topic1/topic2 riêng lẻ nhưng chưa xác nhận Etherscan V2 unified API chấp
+  nhận đúng cú pháp này khi chỉ có topic1 HOẶC topic2 (không có topic1_2_opr đi kèm). **Cần bấm "Poll
+  Multichain (Etherscan) Now" và kiểm tra bảng dữ liệu BSC xem có token lạ (ngoài danh sách 8 token
+  đã biết) xuất hiện không** — nếu không thấy, có thể tham số API cần điều chỉnh lại.
+- **Rủi ro token giả/lừa đảo:** BSC nổi tiếng có nhiều token scam dùng thủ thuật giả sự kiện
+  Transfer (log sự kiện nhưng không thực sự chuyển token, hoặc token honeypot không bán lại được).
+  Hệ thống chỉ xác nhận **có 1 giao dịch swap thật trên chain với giá trị USD tính từ vế
+  USDT/WBNB thật** — không xác minh được bản thân token đó có phải lừa đảo/token rác hay không. Bài
+  đăng X có thể vô tình nhắc đến 1 token scam như thể đó là "cá voi giao dịch lớn" — nên cân nhắc
+  xem lại vài bài đầu có nhắc token BSC lạ trước khi để tự động hoàn toàn.
+- **Tăng số lượng gọi API mỗi chu kỳ quét** — thêm tối đa 4 router × 2 hướng × tối đa 3 trang = tới
+  24 lệnh gọi riêng cho BSC mỗi 5 phút (ngoài phần quét theo token đã có). Có giới hạn phân trang tối
+  đa 3 trang/lượt để tránh treo request quá lâu, nhưng nếu BSC có đợt hoạt động cao điểm, dữ liệu quá
+  3000 dòng/router/hướng trong 1 chu kỳ sẽ bị bỏ sót (chỉ ảnh hưởng lúc dồn dập, không ảnh hưởng theo
+  dõi bình thường).
+
 ### 4.4. Coin680 News Monitor — quét tin tức 2 nguồn
 Tự động lấy RSS feed CoinDesk + Cointelegraph mỗi 5 phút, lưu tiêu đề/link/tóm tắt vào bảng
 `wp_coin680_news_candidates` — **chỉ thu thập, KHÔNG tự viết/tự đăng bài**. Trang admin: **wp-admin
