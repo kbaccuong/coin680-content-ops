@@ -7,11 +7,17 @@
  * stays a manual/reviewed step (see Coin680-News-Playbook.md) -- this
  * class only handles honest data collection.
  *
+ * Narrowed to BITCOIN ONLY (2026-07-30) -- Ethereum/BSC/TRON/Solana moved
+ * to Coin680Bitquery_Fetcher, which covers those chains fresher (own
+ * computed USD values) and adds Solana on top. The API is still queried
+ * broadly (Whale Alert has no reliable single-blockchain filter param) and
+ * non-Bitcoin transactions are simply skipped in poll() before storage.
+ *
  * Also stores the real from/to wallet addresses (not just the owner
- * name/type) -- since EVM address format is shared across Ethereum,
- * Polygon, Arbitrum, BSC etc., Coin680MultiChain_Fetcher cross-references
- * these labeled addresses to recognize the same exchange wallet reused on
- * a different chain, without needing its own separate label database.
+ * name/type) -- originally so Coin680MultiChain_Fetcher (Etherscan-based,
+ * now retired for BSC/Ethereum -- see Coin680Bitquery_Fetcher) could
+ * cross-reference labeled EVM exchange addresses across chains; kept for
+ * reference even though nothing currently consumes it.
  */
 
 if (!defined('ABSPATH')) {
@@ -171,6 +177,18 @@ class Coin680Whale_Fetcher {
 
         foreach ($body['transactions'] as $tx) {
             $latest_ts = max($latest_ts, $tx['timestamp']);
+
+            // Narrowed to Bitcoin only (2026-07-30, per direct request) --
+            // Ethereum/BSC/TRON/Solana now come from Coin680Bitquery_Fetcher
+            // instead, which covers those with fresher data (Bitquery's own
+            // computed USD values, no CoinGecko lookup needed) and adds
+            // Solana, which Whale Alert never had. Bitcoin/XRP/EOS/Stellar/
+            // etc are non-EVM chains Bitquery's DEXTrades don't cover
+            // either, but only Bitcoin is being kept -- the others are
+            // simply dropped rather than migrated anywhere.
+            if (strtolower($tx['blockchain']) !== 'bitcoin') {
+                continue;
+            }
 
             $is_major = in_array(strtolower($tx['symbol']), self::MAJOR_SYMBOLS, true);
             $required_min = $is_major ? $major_min_value : $altcoin_min_value;
