@@ -120,9 +120,10 @@ class Coin680MultiChain_Fetcher {
         // market cap -- fine for BTC/ETH/stablecoins, but UNI, LINK, ARB
         // etc. routinely fall outside that and would silently fail this
         // lookup (returning 0, which then skips the transfer entirely).
-        // Explicitly ask for a wide enough list to cover every id in
-        // Coin680MultiChain_Labels::TOKEN_PRICE_IDS.
-        $coins = coin680_get_crypto_prices(200);
+        // 250 is the actual ceiling -- the function itself clamps to that
+        // (CoinGecko's own per_page hard limit for this endpoint), so this
+        // is the widest coverage possible, not an arbitrary choice.
+        $coins = coin680_get_crypto_prices(250);
         if (!$coins) {
             return 0;
         }
