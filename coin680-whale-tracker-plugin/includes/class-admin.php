@@ -46,8 +46,9 @@ class Coin680Whale_Admin {
             'min_value'            => max(10000, (int) ($_POST['min_value'] ?? 500000)),
             'altcoin_min_value'    => max(100000, (int) ($_POST['altcoin_min_value'] ?? 100000)),
             'mega_threshold'       => max(1000000, (int) ($_POST['mega_threshold'] ?? 50000000)),
-            'etherscan_api_key'    => sanitize_text_field(wp_unslash($_POST['etherscan_api_key'] ?? '')),
-            'multichain_min_value' => max(50000, (int) ($_POST['multichain_min_value'] ?? 100000)),
+            'etherscan_api_key'          => sanitize_text_field(wp_unslash($_POST['etherscan_api_key'] ?? '')),
+            'multichain_min_value'       => max(50000, (int) ($_POST['multichain_min_value'] ?? 100000)),
+            'multichain_token_min_value' => max(1000, (int) ($_POST['multichain_token_min_value'] ?? 10000)),
         );
         update_option('coin680whale_settings', $settings);
         wp_safe_redirect(add_query_arg('saved', '1', admin_url('admin.php?page=coin680-whale-tracker')));
@@ -106,7 +107,8 @@ class Coin680Whale_Admin {
                         <tr><th><?php esc_html_e('Mega-transaction breaking alert threshold (USD)', 'coin680-whale-tracker'); ?></th><td><input type="number" name="mega_threshold" min="1000000" step="1000000" value="<?php echo esc_attr($settings['mega_threshold'] ?? 50000000); ?>"></td></tr>
                         <tr><th colspan="2"><hr></th></tr>
                         <tr><th><?php esc_html_e('Etherscan API Key (unified V2 -- Ethereum/Polygon/Arbitrum now, more chains once upgraded)', 'coin680-whale-tracker'); ?></th><td><input type="text" name="etherscan_api_key" style="width:100%;" value="<?php echo esc_attr($settings['etherscan_api_key'] ?? ''); ?>"></td></tr>
-                        <tr><th><?php esc_html_e('Minimum USD value to track -- multichain (Ethereum/Polygon/Arbitrum)', 'coin680-whale-tracker'); ?></th><td><input type="number" name="multichain_min_value" min="50000" step="10000" value="<?php echo esc_attr($settings['multichain_min_value'] ?? 100000); ?>"></td></tr>
+                        <tr><th><?php esc_html_e('Minimum USD value to track -- multichain: BTC/ETH-wrapped/stablecoins', 'coin680-whale-tracker'); ?></th><td><input type="number" name="multichain_min_value" min="50000" step="10000" value="<?php echo esc_attr($settings['multichain_min_value'] ?? 100000); ?>"></td></tr>
+                        <tr><th><?php esc_html_e('Minimum USD value to track -- multichain: everything else (smaller tokens)', 'coin680-whale-tracker'); ?></th><td><input type="number" name="multichain_token_min_value" min="1000" step="1000" value="<?php echo esc_attr($settings['multichain_token_min_value'] ?? 10000); ?>"> <p class="description"><?php esc_html_e('Lower on purpose, same idea as the altcoin threshold above -- a $10k+ move in a smaller token can be genuinely notable even though it would be routine for USDT/USDC.', 'coin680-whale-tracker'); ?></p></td></tr>
                     </table>
                     <p>
                         <button type="submit" class="button button-primary"><?php esc_html_e('Save Settings', 'coin680-whale-tracker'); ?></button>
