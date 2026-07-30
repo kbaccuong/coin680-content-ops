@@ -45,6 +45,7 @@ class Coin680X_Admin {
             'consumer_secret'     => sanitize_text_field(wp_unslash($_POST['consumer_secret'] ?? '')),
             'access_token'        => sanitize_text_field(wp_unslash($_POST['access_token'] ?? '')),
             'access_token_secret' => sanitize_text_field(wp_unslash($_POST['access_token_secret'] ?? '')),
+            'auto_tweet_category_id' => (int) ($_POST['auto_tweet_category_id'] ?? 2),
         );
         update_option('coin680x_settings', $settings);
         wp_safe_redirect(add_query_arg('saved', '1', admin_url('admin.php?page=coin680-x-scheduler')));
@@ -116,6 +117,14 @@ class Coin680X_Admin {
                         <tr><th><?php esc_html_e('Consumer Secret', 'coin680-x-scheduler'); ?></th><td><input type="text" name="consumer_secret" style="width:100%;" value="<?php echo esc_attr($settings['consumer_secret'] ?? ''); ?>"></td></tr>
                         <tr><th><?php esc_html_e('Access Token', 'coin680-x-scheduler'); ?></th><td><input type="text" name="access_token" style="width:100%;" value="<?php echo esc_attr($settings['access_token'] ?? ''); ?>"></td></tr>
                         <tr><th><?php esc_html_e('Access Token Secret', 'coin680-x-scheduler'); ?></th><td><input type="text" name="access_token_secret" style="width:100%;" value="<?php echo esc_attr($settings['access_token_secret'] ?? ''); ?>"></td></tr>
+                        <tr><th colspan="2"><hr></th></tr>
+                        <tr>
+                            <th><?php esc_html_e('Auto-tweet category ID', 'coin680-x-scheduler'); ?></th>
+                            <td>
+                                <input type="number" name="auto_tweet_category_id" min="0" value="<?php echo esc_attr($settings['auto_tweet_category_id'] ?? 2); ?>" style="width:100px;">
+                                <p class="description"><?php esc_html_e('When a post in this category is published (immediately or via scheduled publish), an X post is queued automatically -- title + excerpt + link + #Crypto #News, no manual writing needed. Default 2 = Crypto Market News. Set to 0 to disable auto-tweeting entirely.', 'coin680-x-scheduler'); ?></p>
+                            </td>
+                        </tr>
                     </table>
                     <p><button type="submit" class="button button-primary"><?php esc_html_e('Save Credentials', 'coin680-x-scheduler'); ?></button></p>
                 </form>
