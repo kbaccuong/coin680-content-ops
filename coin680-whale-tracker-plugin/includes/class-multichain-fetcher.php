@@ -116,7 +116,13 @@ class Coin680MultiChain_Fetcher {
         if (!function_exists('coin680_get_crypto_prices')) {
             return 0;
         }
-        $coins = coin680_get_crypto_prices();
+        // coin680_get_crypto_prices() defaults to only the top 15 coins by
+        // market cap -- fine for BTC/ETH/stablecoins, but UNI, LINK, ARB
+        // etc. routinely fall outside that and would silently fail this
+        // lookup (returning 0, which then skips the transfer entirely).
+        // Explicitly ask for a wide enough list to cover every id in
+        // Coin680MultiChain_Labels::TOKEN_PRICE_IDS.
+        $coins = coin680_get_crypto_prices(200);
         if (!$coins) {
             return 0;
         }
