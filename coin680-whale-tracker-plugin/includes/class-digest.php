@@ -698,6 +698,36 @@ class Coin680Whale_Digest {
     }
 
     /**
+     * Standalone alert for a watched-wallet ("smart money") move, fired
+     * immediately from Coin680Watchlist_Fetcher::maybe_alert() -- doesn't
+     * wait for the regular digest cycle, since these are address-driven
+     * (rare, high-signal) events rather than the amount-driven regular
+     * digest pool. Per-wallet cooldown is handled by the caller before this
+     * is even invoked; this method just builds and queues the tweet.
+     * Added 2026-07-30 alongside Coin680Watchlist_Fetcher, after upgrading
+     * to a paid Bitquery plan.
+     */
+    public function post_watchlist_alert($data) {
+        $action = $data['side'] === 'buy' ? 'bought' : 'sold';
+        $amount_fmt = '$' . number_format($data['amount_usd']);
+        $counter = $data['counter_symbol'] ? " for {$data['counter_symbol']}" : '';
+        $via = $data['dex_name'] ? " via {$data['dex_name']}" : '';
+        $chain_label = ucfirst($data['chain']);
+
+        $text = "👁 #COIN680 SMART MONEY:\n\n";
+        $text .= "{$data['wallet_label']} just {$action} " . self::cashtag($data['symbol']) . "{$counter}{$via} ({$chain_label}), {$amount_fmt}.";
+        if (!empty($data['url'])) {
+            $text .= " {$data['url']}";
+        }
+        $text .= "\n\nTracked because of WHO made this move, not size alone -- context for your own research, not a signal to copy blindly.";
+        $text .= "\n\n#Crypto #SmartMoney #OnChain";
+
+        if (class_exists('Coin680X_Queue')) {
+            Coin680X_Queue::add($text, '', '', current_time('mysql', true));
+        }
+    }
+
+    /**
      * Standalone breaking post for a single mega transaction, fired
      * immediately from Coin680Whale_Fetcher::poll() the moment one is
      * captured -- doesn't wait for the next digest cycle. Whale Alert only
