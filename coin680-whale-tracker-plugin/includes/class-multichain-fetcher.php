@@ -261,6 +261,8 @@ class Coin680MultiChain_Fetcher {
         // address guarantees every tracked token actually gets checked.
         $token_ids = Coin680MultiChain_Labels::TOKEN_PRICE_IDS[$chain] ?? array();
         $all_logs = array();
+        $debug = get_option('coin680multichain_debug', array());
+        $debug[$chain] = array('start_block' => $start_block, 'end_block' => $end_block, 'per_token' => array());
         foreach (array_keys($token_ids) as $token_address) {
             $logs = $this->rpc($chainid, array(
                 'module' => 'logs', 'action' => 'getLogs',
@@ -268,10 +270,13 @@ class Coin680MultiChain_Fetcher {
                 'address' => $token_address,
                 'topic0' => Coin680MultiChain_Labels::TRANSFER_TOPIC,
             ));
+            $count = is_array($logs) ? count($logs) : ('ERROR: ' . var_export($logs, true));
+            $debug[$chain]['per_token'][$token_ids[$token_address]] = $count;
             if (is_array($logs)) {
                 $all_logs = array_merge($all_logs, $logs);
             }
         }
+        update_option('coin680multichain_debug', $debug, false);
 
         if ($all_logs) {
             $this->process_logs($chain, $chainid, $all_logs);
@@ -321,6 +326,24 @@ class Coin680MultiChain_Fetcher {
         $meta = $this->token_meta($chain, $chainid, $token_address);
         $amount = $raw_amount / (10 ** $meta['decimals']);
         $price = $this->current_price($price_id);
+
+        // Temporary debug: record the biggest USD amount seen for this
+        // price_id on this poll, regardless of whether it clears the
+        // threshold, so we can see server-side what's actually being
+        // computed (price, decimals, amount) vs. what the threshold is.
+        $debug = get_option('coin680multichain_debug_amounts', array());
+        $usd_for_debug = $price ? $amount * $price : 0;
+        if (!isset($debug[$price_id]) || $usd_for_debug > $debug[$price_id]['amount_usd']) {
+            $debug[$price_id] = array(
+                'amount_usd' => $usd_for_debug,
+                'raw_amount' => $raw_amount,
+                'decimals'   => $meta['decimals'],
+                'price'      => $price,
+                'threshold'  => $threshold,
+            );
+            update_option('coin680multichain_debug_amounts', $debug, false);
+        }
+
         if (!$price) {
             return;
         }
