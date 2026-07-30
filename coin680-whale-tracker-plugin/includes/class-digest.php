@@ -516,6 +516,93 @@ class Coin680Whale_Digest {
     }
 
     /**
+     * One-off manual test post, triggered from the admin page -- scoped to
+     * ONLY the multichain (Etherscan) source, no Whale Alert, to verify the
+     * new BSC full-token-scan data end to end. Selection rule (per direct
+     * request): up to $limit distinct-symbol transactions by size --
+     * duplicate symbols (same token appearing more than once, even across
+     * chains) collapse to their single largest transaction; NO per-chain
+     * cap, so two different tokens from the same chain can both appear in
+     * one post if they both make the size cut. Fewer than $limit is fine
+     * if that many distinct tokens simply aren't available right now.
+     * Queues via Coin680X_Queue same as the regular digest -- actually
+     * posts within ~5 min via that plugin's own cron, not instantly, so no
+     * separate OAuth call (and no need to have live X credentials in this
+     * chat) is required.
+     */
+    public function post_multichain_test_digest($limit = 7) {
+        global $wpdb;
+        if (!class_exists('Coin680MultiChain_Fetcher')) {
+            return false;
+        }
+        $mc_table = Coin680MultiChain_Fetcher::table_name();
+        $since = gmdate('Y-m-d H:i:s', time() - 48 * HOUR_IN_SECONDS);
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM $mc_table WHERE used_in_digest = 0 AND tx_timestamp >= %s ORDER BY amount_usd DESC LIMIT 300",
+            $since
+        ));
+        if (!$rows) {
+            return false;
+        }
+
+        $picked = array();
+        $picked_symbols = array();
+        foreach ($rows as $row) {
+            if (count($picked) >= $limit) {
+                break;
+            }
+            $sym = strtoupper($row->symbol);
+            if (in_array($sym, $picked_symbols, true)) {
+                continue;
+            }
+            $chain_cfg = class_exists('Coin680MultiChain_Labels') ? Coin680MultiChain_Labels::chain_config($row->chain) : null;
+            $picked[] = (object) array(
+                'source'      => 'multichain',
+                'id'          => (int) $row->id,
+                'symbol'      => $row->symbol,
+                'classification' => $row->classification,
+                'amount_usd'  => (float) $row->amount_usd,
+                'chain_label' => $chain_cfg['label'] ?? ucfirst($row->chain),
+                'url'         => $chain_cfg ? sprintf($chain_cfg['explorer'], $row->tx_hash) : '',
+                'raw'         => $row,
+            );
+            $picked_symbols[] = $sym;
+        }
+
+        if (empty($picked)) {
+            return false;
+        }
+
+        $minutes = max(1, (int) round((time() - strtotime($since)) / 60));
+        $hours = $minutes / 60;
+        $window_label = ($minutes > 60)
+            ? ((floor($hours) == $hours) ? sprintf('%d hour%s', $hours, $hours == 1 ? '' : 's') : sprintf('%.1f hours', $hours))
+            : "{$minutes} min";
+
+        $header = "🐋 #COIN680 MULTICHAIN TEST (last {$window_label}):\n\n";
+        $lines = array();
+        $cashtag_used = false;
+        foreach ($picked as $item) {
+            $amount_fmt = '$' . number_format($item->amount_usd);
+            $blurb = self::classification_blurb($item->raw);
+            $symbol_display = $cashtag_used ? strtoupper($item->symbol) : self::cashtag($item->symbol);
+            $cashtag_used = true;
+            $line = "• {$amount_fmt} {$symbol_display} ({$item->chain_label}) {$blurb}.";
+            if ($item->url) {
+                $line .= " {$item->url}";
+            }
+            $lines[] = $line;
+        }
+        $text = $header . implode("\n\n", $lines) . "\n\n#Crypto #Multichain #OnChain";
+
+        if (class_exists('Coin680X_Queue')) {
+            Coin680X_Queue::add($text, '', '', current_time('mysql', true));
+        }
+        Coin680MultiChain_Fetcher::mark_used(wp_list_pluck($picked, 'id'));
+        return true;
+    }
+
+    /**
      * Standalone breaking post for a single mega transaction, fired
      * immediately from Coin680Whale_Fetcher::poll() the moment one is
      * captured -- doesn't wait for the next digest cycle. Whale Alert only
