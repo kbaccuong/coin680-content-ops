@@ -95,6 +95,35 @@ class Coin680Whale_Admin {
             <?php if (isset($_GET['polled'])) : ?><div class="notice notice-success"><p><?php esc_html_e('Polled Whale Alert.', 'coin680-whale-tracker'); ?></p></div><?php endif; ?>
             <?php if (isset($_GET['mc_polled'])) : ?><div class="notice notice-success"><p><?php esc_html_e('Polled multichain (Etherscan).', 'coin680-whale-tracker'); ?></p></div><?php endif; ?>
 
+            <?php if (class_exists('Coin680MultiChain_Labels')) :
+                $diag_ids = array('tether', 'usd-coin', 'uniswap', 'chainlink', 'wrapped-bitcoin', 'weth');
+                $diag_coins = function_exists('coin680_get_crypto_prices') ? coin680_get_crypto_prices(250) : false;
+            ?>
+            <div class="card" style="max-width:700px;margin-top:16px;background:#fffbe6;">
+                <h2><?php esc_html_e('Price Feed Diagnostic (temporary)', 'coin680-whale-tracker'); ?></h2>
+                <?php if (!$diag_coins) : ?>
+                    <p><strong style="color:red;">coin680_get_crypto_prices(250) returned FALSE/empty -- the price feed call itself is failing on this server right now.</strong></p>
+                <?php else : ?>
+                    <p><?php echo esc_html(count($diag_coins)); ?> coins returned from coin680_get_crypto_prices(250).</p>
+                    <table class="widefat striped">
+                        <thead><tr><th>CoinGecko ID</th><th>Found?</th><th>Price</th></tr></thead>
+                        <tbody>
+                        <?php foreach ($diag_ids as $id) :
+                            $found = null;
+                            foreach ($diag_coins as $c) { if ($c['id'] === $id) { $found = $c; break; } }
+                        ?>
+                            <tr>
+                                <td><?php echo esc_html($id); ?></td>
+                                <td><?php echo $found ? '✅ yes' : '❌ NOT FOUND'; ?></td>
+                                <td><?php echo $found ? '$' . esc_html($found['current_price']) : '-'; ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+
             <div class="card" style="max-width:600px;margin-top:16px;">
                 <h2><?php esc_html_e('Whale Alert API Settings', 'coin680-whale-tracker'); ?></h2>
                 <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
