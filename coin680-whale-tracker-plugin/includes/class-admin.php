@@ -144,8 +144,8 @@ class Coin680Whale_Admin {
             <?php if (isset($_GET['saved'])) : ?><div class="notice notice-success"><p><?php esc_html_e('Settings saved.', 'coin680-whale-tracker'); ?></p></div><?php endif; ?>
             <?php if (isset($_GET['polled'])) : ?><div class="notice notice-success"><p><?php esc_html_e('Polled Whale Alert.', 'coin680-whale-tracker'); ?></p></div><?php endif; ?>
             <?php if (isset($_GET['bq_polled'])) : ?><div class="notice notice-success"><p><?php esc_html_e('Polled Bitquery (Solana/BSC/Ethereum/TRON).', 'coin680-whale-tracker'); ?></p></div><?php endif; ?>
-            <?php if (isset($_GET['mc_test_queued'])) : ?><div class="notice notice-success"><p><?php esc_html_e('Multichain test post queued -- it will actually post to X within about 5 minutes via the X Scheduler cron.', 'coin680-whale-tracker'); ?></p></div><?php endif; ?>
-            <?php if (isset($_GET['mc_test_empty'])) : ?><div class="notice notice-warning"><p><?php esc_html_e('No unused Bitquery transactions in the last 48h to build a test post from -- poll Bitquery first and try again.', 'coin680-whale-tracker'); ?></p></div><?php endif; ?>
+            <?php if (isset($_GET['mc_test_queued'])) : ?><div class="notice notice-success"><p><?php esc_html_e('Post queued -- it will actually post to X within about 5 minutes via the X Scheduler cron.', 'coin680-whale-tracker'); ?></p></div><?php endif; ?>
+            <?php if (isset($_GET['mc_test_empty'])) : ?><div class="notice notice-warning"><p><?php esc_html_e('No unused Bitquery transactions in the last 48h to build a post from -- poll Bitquery first and try again.', 'coin680-whale-tracker'); ?></p></div><?php endif; ?>
 
             <div class="card" style="max-width:600px;margin-top:16px;">
                 <h2><?php esc_html_e('API Settings', 'coin680-whale-tracker'); ?></h2>
@@ -189,7 +189,7 @@ class Coin680Whale_Admin {
                     <input type="hidden" name="action" value="coin680multichain_test_post">
                     <?php wp_nonce_field('coin680multichain_test_post'); ?>
                     <label><?php esc_html_e('Tokens:', 'coin680-whale-tracker'); ?> <input type="number" name="mc_test_limit" value="7" min="1" max="10" style="width:60px;"></label>
-                    <button type="submit" class="button"><?php esc_html_e('Post Multichain Test Now (X)', 'coin680-whale-tracker'); ?></button>
+                    <button type="submit" class="button"><?php esc_html_e('Post Multichain Now (X)', 'coin680-whale-tracker'); ?></button>
                 </form>
             </div>
 
