@@ -23,7 +23,7 @@ if (!defined('ABSPATH')) {
 
 class Coin680Whale_Digest {
     private static $instance = null;
-    const MIN_COINS_TO_POST = 6;
+    const MIN_COINS_TO_POST = 3;
 
     public static function instance() {
         if (self::$instance === null) {
@@ -244,7 +244,7 @@ class Coin680Whale_Digest {
             $blurb = self::classification_blurb($item);
             $url = self::explorer_url($item->blockchain, $item->hash);
             // X rejects an entire post outright if it contains more than one
-            // cashtag ($SYMBOL), and a 5-item digest routinely spans several
+            // cashtag ($SYMBOL), and a multi-item digest routinely spans several
             // different coins -- so only the single largest entry gets the
             // cashtag treatment; the rest fall back to a plain symbol.
             $symbol_display = $cashtag_used ? strtoupper($item->symbol) : self::cashtag($item->symbol);
@@ -262,17 +262,17 @@ class Coin680Whale_Digest {
     }
 
     /**
-     * Picks up to 6 transactions, ONE PER DISTINCT COIN, never two entries
-     * of the same symbol in one post -- if a coin has multiple qualifying
-     * transactions in the window, only its largest is used. If fewer than 6
-     * distinct coins qualify this window, the post simply has fewer lines;
-     * it never pads out to 6 by repeating a coin already featured.
-     * Secondary priority (when there's still room after covering distinct
-     * coins) leans toward classification variety among the coins not yet
-     * picked, so exchange in/out signals aren't crowded out by, say, several
-     * "wallet transfer, purpose unclear" coins.
+     * Picks up to $limit transactions, ONE PER DISTINCT COIN, never two
+     * entries of the same symbol in one post -- if a coin has multiple
+     * qualifying transactions in the window, only its largest is used. If
+     * fewer than $limit distinct coins qualify this window, the post simply
+     * has fewer lines; it never pads out by repeating a coin already
+     * featured. Secondary priority (when there's still room after covering
+     * distinct coins) leans toward classification variety among the coins
+     * not yet picked, so exchange in/out signals aren't crowded out by, say,
+     * several "wallet transfer, purpose unclear" coins.
      */
-    private function select_diverse_items($since, $limit = 6) {
+    private function select_diverse_items($since, $limit = 3) {
         global $wpdb;
         $table = Coin680Whale_Fetcher::table_name();
         $pool = $wpdb->get_results($wpdb->prepare(
