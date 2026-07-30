@@ -3,22 +3,22 @@
  * Builds and posts the recurring "Whale Signal" digest to X, plus standalone
  * breaking alerts for mega transactions and a once-daily recap.
  *
- * No fixed time cadence -- checked every 5 min, but only actually posts once
- * at least MIN_COINS_TO_POST distinct coins have accumulated since the last
- * post (however long that takes). Prioritizes a genuinely varied post over a
- * guaranteed posting interval; per direct feedback, a thin 1-2-coin post
- * every 30 minutes was worse than an occasional longer gap for a fuller
- * post. Pulls from TWO sources: Coin680Whale_Fetcher (Whale Alert -- BTC,
- * ETH, XRP, TRX, and other chains Whale Alert covers, with real exchange
- * labels) and Coin680MultiChain_Fetcher (Ethereum/Polygon/Arbitrum via
- * Etherscan, with DEX-swap detection) -- normalized into one pool so coin
- * diversity and "no duplicate coin" rules apply across both together.
- * Uses only real, already-classified transactions -- no fabricated
- * correlations or invented price reactions. The per-classification framing
- * is standard, widely used analyst shorthand, not a specific claim about
- * what will happen next. Historical comparisons only ever cite numbers
- * actually stored in our own table at the time each transaction was
- * captured.
+ * Checked every 5 min, but only actually posts once at least MIN_COINS_
+ * TO_POST distinct coins have accumulated since the last post -- UNLESS
+ * MAX_WAIT_MINUTES has elapsed, in which case it posts anyway with
+ * whatever's available (fallback cap re-added 2026-07-30 so a post still
+ * goes out at least every ~30 min, matching Whale Alert's old cadence).
+ * Pulls from TWO sources: Coin680Whale_Fetcher (Whale Alert -- Bitcoin
+ * only as of 2026-07-30, see that class) and Coin680Bitquery_Fetcher
+ * (Solana/BSC/Ethereum/TRON via Bitquery, DEX-swap detection -- replaced
+ * the Etherscan-based Coin680MultiChain_Fetcher the same day) -- normalized
+ * into one pool so coin diversity and "no duplicate coin" rules apply
+ * across both together. Uses only real, already-classified transactions --
+ * no fabricated correlations or invented price reactions. The per-
+ * classification framing is standard, widely used analyst shorthand, not a
+ * specific claim about what will happen next. Historical comparisons only
+ * ever cite numbers actually stored in our own table at the time each
+ * transaction was captured.
  */
 
 if (!defined('ABSPATH')) {
@@ -73,9 +73,11 @@ class Coin680Whale_Digest {
      * Names the actual exchange(s)/DEX whenever we have a real label --
      * "left Bybit" / "moved onto OKX" / "acquired via a swap on Uniswap" --
      * rather than the generic "an exchange"/"a DEX", falling back to
-     * generic phrasing only when there's no label to offer. Works on either
-     * a Whale Alert row or a Coin680MultiChain_Fetcher row -- both store
-     * the same from_owner/from_owner_type/to_owner/to_owner_type columns.
+     * generic phrasing only when there's no label to offer. Works on a
+     * Whale Alert row (from_owner/from_owner_type/to_owner/to_owner_type
+     * columns, real CEX labels) or a Coin680Bitquery_Fetcher row (dex_name/
+     * counter_symbol columns, DEX Buy/Sell/Swap only -- no CEX label yet,
+     * see that class's docblock).
      */
     private static function classification_blurb($raw) {
         $from = $raw->from_owner ?? '';
@@ -328,26 +330,16 @@ class Coin680Whale_Digest {
             }
         }
 
-        if (class_exists('Coin680MultiChain_Fetcher')) {
-            $mc_table = Coin680MultiChain_Fetcher::table_name();
-            // Only pull from chains currently enabled in Coin680MultiChain_
-            // Labels::CHAINS -- otherwise old unused rows left over from a
-            // chain that's since been disabled (e.g. Polygon/Arbitrum/Base/
-            // Optimism/Avalanche, narrowed down 2026-07-30 to just Ethereum
-            // + BSC) could still leak into a new post.
-            $enabled_chains = class_exists('Coin680MultiChain_Labels') ? array_keys(Coin680MultiChain_Labels::CHAINS) : array();
-            $mc_rows = array();
-            if ($enabled_chains) {
-                $placeholders = implode(',', array_fill(0, count($enabled_chains), '%s'));
-                $mc_rows = $wpdb->get_results($wpdb->prepare(
-                    "SELECT * FROM $mc_table WHERE used_in_digest = 0 AND tx_timestamp >= %s AND chain IN ($placeholders) ORDER BY amount_usd DESC LIMIT %d",
-                    array_merge(array($since), $enabled_chains, array($limit_each))
-                ));
-            }
-            foreach ($mc_rows as $row) {
-                $chain_cfg = class_exists('Coin680MultiChain_Labels') ? Coin680MultiChain_Labels::chain_config($row->chain) : null;
+        if (class_exists('Coin680Bitquery_Fetcher')) {
+            $bq_table = Coin680Bitquery_Fetcher::table_name();
+            $bq_rows = $wpdb->get_results($wpdb->prepare(
+                "SELECT * FROM $bq_table WHERE used_in_digest = 0 AND tx_timestamp >= %s ORDER BY amount_usd DESC LIMIT %d",
+                $since, $limit_each
+            ));
+            foreach ($bq_rows as $row) {
+                $chain_cfg = class_exists('Coin680Bitquery_Labels') ? Coin680Bitquery_Labels::chain_config($row->chain) : null;
                 $pool[] = (object) array(
-                    'source'      => 'multichain',
+                    'source'      => 'bitquery',
                     'id'          => (int) $row->id,
                     'symbol'      => $row->symbol,
                     'classification' => $row->classification,
@@ -471,11 +463,11 @@ class Coin680Whale_Digest {
         if ($whale_since) {
             $since_candidates[] = $whale_since;
         }
-        if (class_exists('Coin680MultiChain_Fetcher')) {
-            $mc_table = Coin680MultiChain_Fetcher::table_name();
-            $mc_since = $wpdb->get_var("SELECT MIN(tx_timestamp) FROM $mc_table WHERE used_in_digest = 0");
-            if ($mc_since) {
-                $since_candidates[] = $mc_since;
+        if (class_exists('Coin680Bitquery_Fetcher')) {
+            $bq_table = Coin680Bitquery_Fetcher::table_name();
+            $bq_since = $wpdb->get_var("SELECT MIN(tx_timestamp) FROM $bq_table WHERE used_in_digest = 0");
+            if ($bq_since) {
+                $since_candidates[] = $bq_since;
             }
         }
         if (empty($since_candidates)) {
@@ -519,56 +511,49 @@ class Coin680Whale_Digest {
     /**
      * Routes mark_used() calls to the correct table per item, since the
      * combined pool can contain rows from either Coin680Whale_Fetcher or
-     * Coin680MultiChain_Fetcher.
+     * Coin680Bitquery_Fetcher.
      */
     private function mark_pool_used($items) {
         $whale_ids = array();
-        $mc_ids = array();
+        $bq_ids = array();
         foreach ($items as $item) {
             if ($item->source === 'whale_alert') {
                 $whale_ids[] = $item->id;
             } else {
-                $mc_ids[] = $item->id;
+                $bq_ids[] = $item->id;
             }
         }
         if ($whale_ids) {
             Coin680Whale_Fetcher::mark_used($whale_ids);
         }
-        if ($mc_ids && class_exists('Coin680MultiChain_Fetcher')) {
-            Coin680MultiChain_Fetcher::mark_used($mc_ids);
+        if ($bq_ids && class_exists('Coin680Bitquery_Fetcher')) {
+            Coin680Bitquery_Fetcher::mark_used($bq_ids);
         }
     }
 
     /**
      * One-off manual test post, triggered from the admin page -- scoped to
-     * ONLY the multichain (Etherscan) source, no Whale Alert, to verify the
-     * new BSC full-token-scan data end to end. Selection rule (per direct
-     * request): up to $limit distinct-symbol transactions by size --
-     * duplicate symbols (same token appearing more than once, even across
-     * chains) collapse to their single largest transaction; NO per-chain
-     * cap, so two different tokens from the same chain can both appear in
-     * one post if they both make the size cut. Fewer than $limit is fine
-     * if that many distinct tokens simply aren't available right now.
-     * Queues via Coin680X_Queue same as the regular digest -- actually
-     * posts within ~5 min via that plugin's own cron, not instantly, so no
-     * separate OAuth call (and no need to have live X credentials in this
-     * chat) is required.
+     * ONLY the Bitquery (Solana/BSC/Ethereum/TRON) source, no Whale Alert.
+     * Selection rule (per direct request): up to $limit distinct-symbol
+     * transactions by size -- duplicate symbols (same token appearing more
+     * than once, even across chains) collapse to their single largest
+     * transaction; NO per-chain cap, so two different tokens from the same
+     * chain can both appear in one post if they both make the size cut.
+     * Fewer than $limit is fine if that many distinct tokens simply aren't
+     * available right now. Queues via Coin680X_Queue same as the regular
+     * digest -- actually posts within ~5 min via that plugin's own cron,
+     * not instantly, so no separate OAuth call is required.
      */
     public function post_multichain_test_digest($limit = 7) {
         global $wpdb;
-        if (!class_exists('Coin680MultiChain_Fetcher')) {
+        if (!class_exists('Coin680Bitquery_Fetcher')) {
             return false;
         }
-        $mc_table = Coin680MultiChain_Fetcher::table_name();
+        $bq_table = Coin680Bitquery_Fetcher::table_name();
         $since = gmdate('Y-m-d H:i:s', time() - 48 * HOUR_IN_SECONDS);
-        $enabled_chains = class_exists('Coin680MultiChain_Labels') ? array_keys(Coin680MultiChain_Labels::CHAINS) : array();
-        if (!$enabled_chains) {
-            return false;
-        }
-        $placeholders = implode(',', array_fill(0, count($enabled_chains), '%s'));
         $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM $mc_table WHERE used_in_digest = 0 AND tx_timestamp >= %s AND chain IN ($placeholders) ORDER BY amount_usd DESC LIMIT 300",
-            array_merge(array($since), $enabled_chains)
+            "SELECT * FROM $bq_table WHERE used_in_digest = 0 AND tx_timestamp >= %s ORDER BY amount_usd DESC LIMIT 300",
+            $since
         ));
         if (!$rows) {
             return false;
@@ -584,9 +569,9 @@ class Coin680Whale_Digest {
             if (in_array($sym, $picked_symbols, true)) {
                 continue;
             }
-            $chain_cfg = class_exists('Coin680MultiChain_Labels') ? Coin680MultiChain_Labels::chain_config($row->chain) : null;
+            $chain_cfg = class_exists('Coin680Bitquery_Labels') ? Coin680Bitquery_Labels::chain_config($row->chain) : null;
             $picked[] = (object) array(
-                'source'      => 'multichain',
+                'source'      => 'bitquery',
                 'id'          => (int) $row->id,
                 'symbol'      => $row->symbol,
                 'classification' => $row->classification,
@@ -627,7 +612,7 @@ class Coin680Whale_Digest {
         if (class_exists('Coin680X_Queue')) {
             Coin680X_Queue::add($text, '', '', current_time('mysql', true));
         }
-        Coin680MultiChain_Fetcher::mark_used(wp_list_pluck($picked, 'id'));
+        Coin680Bitquery_Fetcher::mark_used(wp_list_pluck($picked, 'id'));
         return true;
     }
 
