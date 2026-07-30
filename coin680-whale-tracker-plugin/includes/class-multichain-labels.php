@@ -135,6 +135,20 @@ class Coin680MultiChain_Labels {
     // keccak256("Transfer(address,address,uint256)") -- the ERC-20 Transfer event signature.
     const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 
+    /**
+     * CoinGecko ids treated as "major" for threshold purposes -- stablecoins
+     * and wrapped BTC/ETH/native-gas tokens use the higher multichain_min_value
+     * threshold, same as BTC/ETH/USDT/USDC do on the Whale Alert side.
+     * Everything else (UNI, LINK, ARB, and anything added later) uses the
+     * lower token_min_value threshold instead, so a genuinely large move in
+     * a smaller token isn't held to the same bar as a routine USDT transfer.
+     */
+    const MAJOR_PRICE_IDS = array('tether', 'usd-coin', 'dai', 'weth', 'wrapped-bitcoin', 'wmatic', 'ethereum', 'bitcoin', 'matic-network');
+
+    public static function is_major_price_id($price_id) {
+        return in_array($price_id, self::MAJOR_PRICE_IDS, true);
+    }
+
     public static function chain_config($chain) {
         return self::CHAINS[$chain] ?? null;
     }
