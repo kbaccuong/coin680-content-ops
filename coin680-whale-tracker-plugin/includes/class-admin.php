@@ -210,11 +210,24 @@ class Coin680Whale_Admin {
             </div>
 
             <?php if (class_exists('Coin680MultiChain_Fetcher')) :
-                $mc_total = Coin680MultiChain_Fetcher::count_recent(24);
-                $mc_items = Coin680MultiChain_Fetcher::get_recent(24, self::PER_PAGE, ($mc_page - 1) * self::PER_PAGE);
+                $mc_chain = sanitize_key($_GET['mc_chain'] ?? '');
+                $mc_valid_chains = class_exists('Coin680MultiChain_Labels') ? array_keys(Coin680MultiChain_Labels::CHAINS) : array();
+                if ($mc_chain && !in_array($mc_chain, $mc_valid_chains, true)) {
+                    $mc_chain = '';
+                }
+                $mc_total = Coin680MultiChain_Fetcher::count_recent(24, $mc_chain ?: null);
+                $mc_items = Coin680MultiChain_Fetcher::get_recent(24, self::PER_PAGE, ($mc_page - 1) * self::PER_PAGE, $mc_chain ?: null);
+                $mc_base_url = remove_query_arg(array('saved', 'polled', 'mc_polled', 'mc_page'));
             ?>
             <div class="card" style="max-width:1100px;margin-top:16px;">
-                <h2><?php esc_html_e('Multichain (Ethereum/Polygon/Arbitrum) -- Last 24 Hours', 'coin680-whale-tracker'); ?></h2>
+                <h2><?php esc_html_e('Multichain (Ethereum/Polygon/Arbitrum/BSC/Base/Optimism/Avalanche) -- Last 24 Hours', 'coin680-whale-tracker'); ?></h2>
+                <p>
+                    <strong><?php esc_html_e('Filter by chain:', 'coin680-whale-tracker'); ?></strong>
+                    <a class="button <?php echo $mc_chain === '' ? 'button-primary' : ''; ?>" href="<?php echo esc_url(remove_query_arg('mc_chain', $mc_base_url)); ?>"><?php esc_html_e('All', 'coin680-whale-tracker'); ?></a>
+                    <?php foreach ($mc_valid_chains as $c) : $cfg = Coin680MultiChain_Labels::chain_config($c); ?>
+                        <a class="button <?php echo $mc_chain === $c ? 'button-primary' : ''; ?>" href="<?php echo esc_url(add_query_arg('mc_chain', $c, $mc_base_url)); ?>"><?php echo esc_html($cfg['label'] ?? ucfirst($c)); ?></a>
+                    <?php endforeach; ?>
+                </p>
                 <table class="widefat striped">
                     <thead><tr>
                         <th><?php esc_html_e('Time (UTC)', 'coin680-whale-tracker'); ?></th>
