@@ -17,6 +17,8 @@ define('COIN680WHALE_DIR', plugin_dir_path(__FILE__));
 require_once COIN680WHALE_DIR . 'includes/class-fetcher.php';
 require_once COIN680WHALE_DIR . 'includes/class-bitquery-labels.php';
 require_once COIN680WHALE_DIR . 'includes/class-bitquery-fetcher.php';
+require_once COIN680WHALE_DIR . 'includes/class-watchlist.php';
+require_once COIN680WHALE_DIR . 'includes/class-watchlist-fetcher.php';
 require_once COIN680WHALE_DIR . 'includes/class-admin.php';
 require_once COIN680WHALE_DIR . 'includes/class-digest.php';
 
@@ -40,15 +42,30 @@ function coin680whale_add_cron_interval($schedules) {
             'display'  => __('Every 5 Minutes (Coin680)', 'coin680-whale-tracker'),
         );
     }
+    // Added 2026-07-30 after upgrading to a paid Bitquery plan (was hitting
+    // the free tier's monthly point cap in under a day at the 5-min rate,
+    // so there was no room to poll faster before). 2 minutes was chosen
+    // over something more aggressive by estimating from that free-tier burn
+    // rate: roughly 2.5x the call volume of 5-min polling, comfortably
+    // within the paid plan's headroom with room left over for the new
+    // watched-wallet polling below, rather than maximizing frequency and
+    // risking burning through the new budget just as fast.
+    if (!isset($schedules['coin680x_two_minutes'])) {
+        $schedules['coin680x_two_minutes'] = array(
+            'interval' => 120,
+            'display'  => __('Every 2 Minutes (Coin680)', 'coin680-whale-tracker'),
+        );
+    }
     return $schedules;
 }
 add_filter('cron_schedules', 'coin680whale_add_cron_interval');
 
-const COIN680WHALE_DB_VERSION = '1.4';
+const COIN680WHALE_DB_VERSION = '1.5';
 
 function coin680whale_init() {
     Coin680Whale_Fetcher::instance();
     Coin680Bitquery_Fetcher::instance();
+    Coin680Watchlist_Fetcher::instance();
     Coin680Whale_Digest::instance();
     if (is_admin()) {
         Coin680Whale_Admin::instance();
@@ -61,6 +78,8 @@ function coin680whale_init() {
     if (get_option('coin680whale_db_version') !== COIN680WHALE_DB_VERSION) {
         Coin680Whale_Fetcher::create_table();
         Coin680Bitquery_Fetcher::create_table();
+        Coin680Watchlist::create_table();
+        Coin680Watchlist_Fetcher::create_table();
         coin680whale_migrate_to_bitquery();
         coin680whale_retire_whale_alert_posting();
         update_option('coin680whale_db_version', COIN680WHALE_DB_VERSION);
@@ -97,6 +116,20 @@ function coin680whale_init() {
     }
     if (!wp_next_scheduled('coin680whale_daily_recap')) {
         wp_schedule_event(time(), 'daily', 'coin680whale_daily_recap');
+    }
+
+    // Same self-healing pattern applied to the two market-data polling
+    // hooks (added 2026-07-30, proactively -- these had the identical
+    // "only ever scheduled once" gap that caused the digest cron bug fixed
+    // earlier the same day, just never actually confirmed broken live).
+    // coin680bitquery_poll moved from the shared 5-min interval to the new
+    // 2-min one as part of the same change (see coin680whale_add_cron_
+    // interval() above for why 2 min specifically).
+    if (!wp_next_scheduled('coin680bitquery_poll')) {
+        wp_schedule_event(time(), 'coin680x_two_minutes', 'coin680bitquery_poll');
+    }
+    if (!wp_next_scheduled('coin680watchlist_poll')) {
+        wp_schedule_event(time(), 'coin680x_two_minutes', 'coin680watchlist_poll');
     }
 }
 add_action('plugins_loaded', 'coin680whale_init');
@@ -145,12 +178,20 @@ function coin680whale_migrate_to_bitquery() {
 function coin680whale_activate() {
     Coin680Whale_Fetcher::create_table();
     Coin680Bitquery_Fetcher::create_table();
+    Coin680Watchlist::create_table();
+    Coin680Watchlist_Fetcher::create_table();
     update_option('coin680whale_db_version', COIN680WHALE_DB_VERSION);
     if (!wp_next_scheduled('coin680whale_digest_check')) {
         wp_schedule_event(time(), 'coin680x_five_minutes', 'coin680whale_digest_check');
     }
     if (!wp_next_scheduled('coin680whale_daily_recap')) {
         wp_schedule_event(time(), 'daily', 'coin680whale_daily_recap');
+    }
+    if (!wp_next_scheduled('coin680bitquery_poll')) {
+        wp_schedule_event(time(), 'coin680x_two_minutes', 'coin680bitquery_poll');
+    }
+    if (!wp_next_scheduled('coin680watchlist_poll')) {
+        wp_schedule_event(time(), 'coin680x_two_minutes', 'coin680watchlist_poll');
     }
 }
 register_activation_hook(__FILE__, 'coin680whale_activate');
@@ -161,6 +202,8 @@ function coin680whale_deactivate() {
     wp_clear_scheduled_hook('coin680multichain_poll'); // clears any leftover schedule from before 1.3.0
     wp_clear_scheduled_hook('coin680whale_digest_check');
     wp_clear_scheduled_hook('coin680whale_daily_recap');
+    wp_clear_scheduled_hook('coin680watchlist_poll');
 }
 register_deactivation_hook(__FILE__, 'coin680whale_deactivate');
+
 
