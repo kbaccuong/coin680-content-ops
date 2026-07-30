@@ -87,6 +87,44 @@ get_header();
         <?php endif; ?>
     </section>
 
+    <section class="c680-category-section c680-home-whale-section">
+        <h2 class="c680-section-title"><a href="<?php echo esc_url(home_url('/whale-signals/')); ?>"><?php esc_html_e('Live Whale Signals', 'coin680'); ?></a></h2>
+        <?php
+        $coin680_home_ws = function_exists('coin680_ws_query_signals') ? coin680_ws_query_signals('', '', 1) : array('items' => array());
+        $coin680_home_ws_items = array_slice($coin680_home_ws['items'], 0, 6);
+        if ($coin680_home_ws_items) :
+        ?>
+        <div class="c680-prices-table-wrap">
+            <table class="c680-prices-table c680-ws-table">
+                <thead>
+                    <tr>
+                        <th><?php esc_html_e('Time', 'coin680'); ?></th>
+                        <th><?php esc_html_e('Asset', 'coin680'); ?></th>
+                        <th><?php esc_html_e('Type', 'coin680'); ?></th>
+                        <th><?php esc_html_e('Amount', 'coin680'); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($coin680_home_ws_items as $coin680_hws) :
+                        $coin680_hws_type_class = $coin680_hws['classification'] === 'DEX Buy' ? 'c680-ticker-up' : ($coin680_hws['classification'] === 'DEX Sell' ? 'c680-ticker-down' : '');
+                        $coin680_hws_big = $coin680_hws['is_big'] ? ' <span class="c680-ws-big-badge">&#128293;</span>' : '';
+                    ?>
+                    <tr>
+                        <td><?php echo esc_html($coin680_hws['time_ago']); ?></td>
+                        <td class="c680-prices-name"><strong><?php echo esc_html($coin680_hws['symbol']); ?></strong> <?php echo esc_html($coin680_hws['chain_label']); ?><?php echo $coin680_hws_big; ?></td>
+                        <td class="<?php echo esc_attr($coin680_hws_type_class); ?>"><?php echo esc_html($coin680_hws['classification']); ?></td>
+                        <td><?php echo esc_html($coin680_hws['amount_fmt']); ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <a class="c680-more-link" href="<?php echo esc_url(home_url('/whale-signals/')); ?>"><?php esc_html_e('View All Whale Signals →', 'coin680'); ?></a>
+        <?php else : ?>
+        <p><?php esc_html_e('No signals in the current window yet -- check back shortly.', 'coin680'); ?></p>
+        <?php endif; ?>
+    </section>
+
     <?php
     coin680_category_section(__('Crypto Market News', 'coin680'), 'crypto-market-news', 8);
     coin680_category_section(__('Business & Institutions', 'coin680'), 'business-institutions', 4);
@@ -135,3 +173,4 @@ get_header();
 
 </main>
 <?php get_footer(); ?>
+
