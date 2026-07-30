@@ -552,3 +552,16 @@ main { display: block; max-width: 1200px; margin: 0 auto; padding: 0 20px; }
 .tiny-cross-sell-price { color: #c11510; font-weight: bold; font-size: 22px; }
 .tiny-cross-sell-btn { background-color: #111c2d; color: #ffffff; padding: 12px 30px; border-radius: 4px; text-decoration: none; font-weight: bold; font-size: 15px; display: inline-block; text-align: center; }
 .tiny-cross-sell-btn:hover { background-color: #0c1420; }
+
+/* Live Whale Signals page (added 2026-07-30) */
+.c680-ws-page { max-width: 960px; }
+.c680-ws-section { margin-bottom: 36px; }
+.c680-ws-section:last-of-type { margin-bottom: 20px; }
+.c680-ws-chain-filter { margin-bottom: 16px; flex-wrap: wrap; }
+.c680-ws-chain-filter .c680-gl-tab { text-decoration: none; display: inline-block; }
+.c680-ws-refresh {
+  background: var(--c680-navy); color: #fff; border: none; border-radius: 4px;
+  padding: 4px 12px; font-size: 12px; font-weight: 600; cursor: pointer; margin-left: 8px;
+}
+.c680-ws-refresh:hover { background: var(--c680-red); }
+
