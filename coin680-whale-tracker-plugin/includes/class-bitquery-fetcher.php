@@ -137,7 +137,17 @@ class Coin680Bitquery_Fetcher {
         // where the OTHER side is the one carrying a real price.
         $min = min($this->major_threshold(), $this->token_threshold());
 
-        $fields = '{ Index } Buy { Amount AmountInUSD Currency { Symbol } %ADDR_BUY% } Sell { Amount AmountInUSD Currency { Symbol } %ADDR_SELL% } Dex { ProtocolName }';
+        // NOTE: these are the FIELDS INSIDE "Trade { ... }" -- the caller
+        // wraps them as "Trade { {$trade_fields} }" below. (An earlier
+        // version of this string started with a stray "{ Index }" and was
+        // interpolated as "Trade {$trade_fields}" with no explicit outer
+        // braces -- since PHP's "{$var}" syntax is just an interpolation
+        // delimiter, not a literal brace, that closed Trade's selection
+        // set right after Index and left Buy/Sell/Dex as invalid top-level
+        // siblings, so Bitquery rejected every query and poll() silently
+        // did nothing. Fixed 2026-07-30 after the admin table stayed
+        // empty even after polling.)
+        $fields = 'Index Buy { Amount AmountInUSD Currency { Symbol } %ADDR_BUY% } Sell { Amount AmountInUSD Currency { Symbol } %ADDR_SELL% } Dex { ProtocolName }';
 
         if ($config['query_kind'] === 'solana') {
             $trade_fields = str_replace(
@@ -145,7 +155,7 @@ class Coin680Bitquery_Fetcher {
                 array('Account { Address }', 'Account { Address }'),
                 $fields
             );
-            $query = "{ Solana { DEXTrades(limit: {count: 200} orderBy: {descending: Block_Time} where: {Block: {Time: {since: \"{$since}\" till: \"{$now}\"}} any: [{Trade: {Buy: {AmountInUSD: {gt: \"{$min}\"}}}} {Trade: {Sell: {AmountInUSD: {gt: \"{$min}\"}}}}]}) { Transaction { Signature } Trade {$trade_fields} Block { Time } } } }";
+            $query = "{ Solana { DEXTrades(limit: {count: 200} orderBy: {descending: Block_Time} where: {Block: {Time: {since: \"{$since}\" till: \"{$now}\"}} any: [{Trade: {Buy: {AmountInUSD: {gt: \"{$min}\"}}}} {Trade: {Sell: {AmountInUSD: {gt: \"{$min}\"}}}}]}) { Transaction { Signature } Trade { {$trade_fields} } Block { Time } } } }";
         } elseif ($config['query_kind'] === 'evm') {
             $trade_fields = str_replace(
                 array('%ADDR_BUY%', '%ADDR_SELL%'),
@@ -153,10 +163,10 @@ class Coin680Bitquery_Fetcher {
                 $fields
             );
             $network = $config['network'];
-            $query = "{ EVM(network: {$network}) { DEXTrades(limit: {count: 200} orderBy: {descending: Block_Time} where: {Block: {Time: {since: \"{$since}\" till: \"{$now}\"}} any: [{Trade: {Buy: {AmountInUSD: {gt: \"{$min}\"}}}} {Trade: {Sell: {AmountInUSD: {gt: \"{$min}\"}}}}]}) { Transaction { Hash } Trade {$trade_fields} Block { Time } } } }";
+            $query = "{ EVM(network: {$network}) { DEXTrades(limit: {count: 200} orderBy: {descending: Block_Time} where: {Block: {Time: {since: \"{$since}\" till: \"{$now}\"}} any: [{Trade: {Buy: {AmountInUSD: {gt: \"{$min}\"}}}} {Trade: {Sell: {AmountInUSD: {gt: \"{$min}\"}}}}]}) { Transaction { Hash } Trade { {$trade_fields} } Block { Time } } } }";
         } else { // tron
             $trade_fields = str_replace(array('%ADDR_BUY%', '%ADDR_SELL%'), array('', ''), $fields);
-            $query = "{ Tron { DEXTrades(limit: {count: 200} orderBy: {descending: Block_Time} where: {Block: {Time: {since: \"{$since}\" till: \"{$now}\"}} any: [{Trade: {Buy: {AmountInUSD: {gt: \"{$min}\"}}}} {Trade: {Sell: {AmountInUSD: {gt: \"{$min}\"}}}}]}) { Transaction { Hash } Trade {$trade_fields} Block { Time } } } }";
+            $query = "{ Tron { DEXTrades(limit: {count: 200} orderBy: {descending: Block_Time} where: {Block: {Time: {since: \"{$since}\" till: \"{$now}\"}} any: [{Trade: {Buy: {AmountInUSD: {gt: \"{$min}\"}}}} {Trade: {Sell: {AmountInUSD: {gt: \"{$min}\"}}}}]}) { Transaction { Hash } Trade { {$trade_fields} } Block { Time } } } }";
         }
 
         $data = $this->gql($query);
