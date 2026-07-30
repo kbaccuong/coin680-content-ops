@@ -150,7 +150,7 @@ class Coin680Watchlist_Fetcher {
                 array('Account { Address }', 'Account { Address }'),
                 $fields
             );
-            $query = "{ Solana { DEXTrades(limit: {count: 200} orderBy: {descending: Block_Time} where: {Block: {Time: {since: \"{$since}\" till: \"{$now}\"}} any: [{Trade: {Buy: {Account: {Address: {in: {$address_list}}}}}} {Trade: {Sell: {Account: {Address: {in: {$address_list}}}}}}]}) { Transaction { Signature } Trade { {$trade_fields} } Block { Time } } } }";
+            $query = "{ Solana { DEXTrades(limit: {count: 50} orderBy: {descending: Block_Time} where: {Block: {Time: {since: \"{$since}\" till: \"{$now}\"}} any: [{Trade: {Buy: {Account: {Address: {in: {$address_list}}}}}} {Trade: {Sell: {Account: {Address: {in: {$address_list}}}}}}]}) { Transaction { Signature } Trade { {$trade_fields} } Block { Time } } } }";
         } else { // evm
             $trade_fields = str_replace(
                 array('%ADDR_BUY%', '%ADDR_SELL%'),
@@ -158,7 +158,7 @@ class Coin680Watchlist_Fetcher {
                 $fields
             );
             $network = $config['network'];
-            $query = "{ EVM(network: {$network}) { DEXTrades(limit: {count: 200} orderBy: {descending: Block_Time} where: {Block: {Time: {since: \"{$since}\" till: \"{$now}\"}} any: [{Trade: {Buy: {Buyer: {in: {$address_list}}}}} {Trade: {Sell: {Seller: {in: {$address_list}}}}}]}) { Transaction { Hash } Trade { {$trade_fields} } Block { Time } } } }";
+            $query = "{ EVM(network: {$network}) { DEXTrades(limit: {count: 50} orderBy: {descending: Block_Time} where: {Block: {Time: {since: \"{$since}\" till: \"{$now}\"}} any: [{Trade: {Buy: {Buyer: {in: {$address_list}}}}} {Trade: {Sell: {Seller: {in: {$address_list}}}}}]}) { Transaction { Hash } Trade { {$trade_fields} } Block { Time } } } }";
         }
 
         $data = $this->gql($query);
