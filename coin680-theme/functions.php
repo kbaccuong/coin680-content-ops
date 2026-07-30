@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('COIN680_VERSION', '1.3.7');
+define('COIN680_VERSION', '1.3.8');
 
 /* ==========================================================================
    Theme setup
@@ -817,6 +817,155 @@ function coin680_newsletter_script() {
     <?php
 }
 add_action('wp_footer', 'coin680_newsletter_script');
+
+/**
+ * ---------------------------------------------------------------------
+ * Live Whale Signals page support (added 2026-07-30, after upgrading to a
+ * paid Bitquery plan). Shared between the initial server-render in
+ * page-whale-signals.php and the /coin680/v1/whale-signals REST endpoint
+ * (used for the page's ~20s auto-refresh) so formatting/filtering logic
+ * lives in exactly one place -- the JS side is a dumb renderer with no
+ * business logic of its own, can't drift out of sync with the PHP render.
+ * ---------------------------------------------------------------------
+ */
+
+/**
+ * "3h 12m ago" style relative time -- deliberately more precise than
+ * human_time_diff() alone, which collapses to just the largest unit
+ * ("3 hours") and loses granularity that matters on a fast-moving feed.
+ */
+function coin680_ws_time_ago($mysql_datetime) {
+    $diff = time() - strtotime($mysql_datetime . ' UTC');
+    if ($diff < 60) {
+        return __('just now', 'coin680');
+    }
+    $mins = (int) floor($diff / 60);
+    if ($mins < 60) {
+        return sprintf(__('%dm ago', 'coin680'), $mins);
+    }
+    $hours = (int) floor($mins / 60);
+    $rem_mins = $mins % 60;
+    if ($hours < 24) {
+        return $rem_mins > 0
+            ? sprintf(__('%1$dh %2$dm ago', 'coin680'), $hours, $rem_mins)
+            : sprintf(__('%dh ago', 'coin680'), $hours);
+    }
+    return sprintf(__('%dd ago', 'coin680'), (int) floor($hours / 24));
+}
+
+// Transactions at or above this size get the "big move" badge on the
+// public page -- separate from (and higher than) the $100k/$10k inclusion
+// thresholds in the Whale Tracker settings, which control what gets
+// CAPTURED at all, not what counts as notably large once captured.
+define('COIN680_WS_BIG_MOVE_USD', 1000000);
+
+function coin680_ws_format_signal($row) {
+    $chain_cfg = class_exists('Coin680Bitquery_Labels') ? Coin680Bitquery_Labels::chain_config($row->chain) : null;
+    return array(
+        'time_ago'       => coin680_ws_time_ago($row->tx_timestamp),
+        'timestamp'      => $row->tx_timestamp,
+        'chain_label'    => $chain_cfg['label'] ?? ucfirst($row->chain),
+        'symbol'         => strtoupper($row->symbol),
+        'counter_symbol' => $row->counter_symbol,
+        'classification' => $row->classification,
+        'dex_name'       => $row->dex_name,
+        'amount_usd'     => (float) $row->amount_usd,
+        'amount_fmt'     => '$' . number_format($row->amount_usd),
+        'is_big'         => ((float) $row->amount_usd) >= COIN680_WS_BIG_MOVE_USD,
+        'tx_url'         => ($chain_cfg && $row->tx_hash) ? sprintf($chain_cfg['explorer'], $row->tx_hash) : '',
+    );
+}
+
+function coin680_ws_format_watchlist_move($row) {
+    $chain_cfg = class_exists('Coin680Bitquery_Labels') ? Coin680Bitquery_Labels::chain_config($row->chain) : null;
+    return array(
+        'time_ago'     => coin680_ws_time_ago($row->tx_timestamp),
+        'wallet_label' => $row->wallet_label ?: (substr($row->wallet_address, 0, 6) . '...' . substr($row->wallet_address, -4)),
+        'chain_label'  => $chain_cfg['label'] ?? ucfirst($row->chain),
+        'side'         => $row->side,
+        'symbol'       => strtoupper($row->symbol),
+        'amount_fmt'   => '$' . number_format($row->amount_usd),
+    );
+}
+
+const COIN680_WS_PER_PAGE = 60;
+const COIN680_WS_HOURS = 168; // 7 days of browsable history
+
+function coin680_ws_query_signals($chain, $type, $page) {
+    if (!class_exists('Coin680Bitquery_Fetcher')) {
+        return array('items' => array(), 'total' => 0, 'pages' => 1, 'page' => 1);
+    }
+    $classification_map = array('buy' => 'DEX Buy', 'sell' => 'DEX Sell', 'swap' => 'DEX Swap');
+    $classification = $classification_map[$type] ?? null;
+    $page = max(1, (int) $page);
+    $offset = ($page - 1) * COIN680_WS_PER_PAGE;
+
+    $total = Coin680Bitquery_Fetcher::count_recent(COIN680_WS_HOURS, $chain ?: null, $classification);
+    $rows = Coin680Bitquery_Fetcher::get_recent(COIN680_WS_HOURS, COIN680_WS_PER_PAGE, $offset, $chain ?: null, $classification, 'tx_timestamp');
+
+    return array(
+        'items' => array_map('coin680_ws_format_signal', $rows),
+        'total' => $total,
+        'pages' => max(1, (int) ceil($total / COIN680_WS_PER_PAGE)),
+        'page'  => $page,
+    );
+}
+
+function coin680_register_whale_signals_route() {
+    register_rest_route('coin680/v1', '/whale-signals', array(
+        'methods'             => 'GET',
+        'callback'            => 'coin680_handle_whale_signals',
+        'permission_callback' => '__return_true',
+        'args'                => array(
+            'chain' => array('required' => false),
+            'type'  => array('required' => false),
+            'page'  => array('required' => false, 'default' => 1),
+        ),
+    ));
+}
+add_action('rest_api_init', 'coin680_register_whale_signals_route');
+
+/**
+ * Server-side row renderer -- deliberately mirrors the JS renderRow()
+ * function in page-whale-signals.php's inline <script> field-for-field
+ * (same classes, same "Big" badge, same column order) so the initial
+ * server-rendered table and the first AJAX refresh never visibly "jump" or
+ * look inconsistent to a visitor who happens to be watching right as the
+ * first refresh lands.
+ */
+function coin680_ws_render_rows($items) {
+    if (empty($items)) {
+        return '<tr><td colspan="6">' . esc_html__('No signals in this window yet -- check back shortly.', 'coin680') . '</td></tr>';
+    }
+    $out = '';
+    foreach ($items as $item) {
+        $type_class = $item['classification'] === 'DEX Buy' ? 'c680-ticker-up' : ($item['classification'] === 'DEX Sell' ? 'c680-ticker-down' : '');
+        $big_badge = $item['is_big'] ? ' <span class="c680-ws-big-badge">&#128293; ' . esc_html__('Big', 'coin680') . '</span>' : '';
+        $counter = $item['counter_symbol'] ? ' <small>vs ' . esc_html($item['counter_symbol']) . '</small>' : '';
+        $tx_link = $item['tx_url'] ? '<a href="' . esc_url($item['tx_url']) . '" target="_blank" rel="noopener">' . esc_html__('View', 'coin680') . '</a>' : '';
+        $out .= '<tr class="' . ($item['is_big'] ? 'c680-ws-row-big' : '') . '">'
+            . '<td>' . esc_html($item['time_ago']) . '</td>'
+            . '<td class="c680-prices-name"><strong>' . esc_html($item['symbol']) . '</strong> ' . esc_html($item['chain_label']) . $big_badge . '</td>'
+            . '<td class="' . esc_attr($type_class) . '">' . esc_html($item['classification']) . $counter . '</td>'
+            . '<td>' . esc_html($item['dex_name']) . '</td>'
+            . '<td>' . esc_html($item['amount_fmt']) . '</td>'
+            . '<td>' . $tx_link . '</td>'
+            . '</tr>';
+    }
+    return $out;
+}
+
+function coin680_handle_whale_signals(WP_REST_Request $request) {
+    $chain = sanitize_key($request->get_param('chain'));
+    $valid_chains = class_exists('Coin680Bitquery_Labels') ? array_keys(Coin680Bitquery_Labels::CHAINS) : array();
+    if ($chain && !in_array($chain, $valid_chains, true)) {
+        $chain = '';
+    }
+    $type = sanitize_key($request->get_param('type'));
+    $result = coin680_ws_query_signals($chain, $type, $request->get_param('page'));
+    $result['updated'] = current_time('mysql', true);
+    return new WP_REST_Response($result, 200);
+}
 
 /* ==========================================================================
    Social share buttons -- plain share-intent links (X, Facebook, Telegram)
