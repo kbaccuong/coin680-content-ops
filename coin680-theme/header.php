@@ -50,6 +50,9 @@ wp_reset_postdata();
             ));
             ?>
         </nav>
+        <a href="https://x.com/coin680" target="_blank" rel="noopener" class="c680-header-x" aria-label="<?php esc_attr_e('Follow Coin680 on X', 'coin680'); ?>" title="<?php esc_attr_e('Follow us on X', 'coin680'); ?>">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        </a>
     </div>
 </header>
 <script>
