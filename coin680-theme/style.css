@@ -471,7 +471,7 @@ main { display: block; max-width: 1200px; margin: 0 auto; padding: 0 20px; }
    so posts render correctly without a separate Additional CSS paste step.
    ========================================================================== */
 
-.tiny-wrapper { font-family: 'Roboto', Arial, sans-serif; font-size: 16px; line-height: 1.7; color: #333333; background-color: #ffffff; padding: 0; margin: 0; }
+.tiny-wrapper { font-family: 'Roboto', Arial, sans-serif; font-size: 16px; line-height: 1.7; color: #333333; background-color: #ffffff; padding: 0; margin: 0; overflow-x: auto; }
 .tiny-sapo { margin-bottom: 20px; }
 .tiny-sapo a { color: #c11510; text-decoration: none; font-weight: bold; }
 .tiny-sapo a:hover { text-decoration: underline; }
@@ -484,6 +484,17 @@ main { display: block; max-width: 1200px; margin: 0 auto; padding: 0 20px; }
 .tiny-toc-list a:hover { text-decoration: underline; }
 
 .tiny-disclaimer { font-style: italic; color: #777777; font-size: 14px; margin-top: 30px; border-top: 1px solid #eaeaea; padding-top: 15px; }
+
+/* Plain <table> inside article content (stats/comparison tables) -- was
+   completely unstyled before, rendering as unbordered browser-default text
+   with no visual separation between cells (reported as "messy"). .tiny-
+   wrapper's own overflow-x:auto (see above) keeps a wide table from
+   breaking mobile layout. */
+.tiny-wrapper table { width: 100%; border-collapse: collapse; margin: 25px 0; font-size: 15px; }
+.tiny-wrapper table th { background-color: #111c2d; color: #ffffff; text-align: left; padding: 10px 14px; font-weight: bold; }
+.tiny-wrapper table td { padding: 10px 14px; border-bottom: 1px solid #eaeaea; }
+.tiny-wrapper table tbody tr:nth-child(even) td { background-color: #fffbf2; }
+.tiny-wrapper table tbody tr:last-child td { border-bottom: none; }
 
 /* Multi-niche CTA (Blog / Bitcoin Academy) */
 .tiny-cta-multi { border: 2px solid #c11510; border-radius: 8px; margin: 40px 0; position: relative; background: #fffbf2; display: flex; flex-wrap: wrap; padding: 25px; box-shadow: 0 4px 12px rgba(17,28,45,0.05); }
