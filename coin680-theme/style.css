@@ -565,3 +565,54 @@ main { display: block; max-width: 1200px; margin: 0 auto; padding: 0 20px; }
 }
 .c680-ws-refresh:hover { background: var(--c680-red); }
 
+/* Live Whale Signals page v2 (added 2026-07-30): public watched-wallets
+   directory, live badge, type filter row, big-move badge, pagination */
+.c680-ws-heading-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.c680-ws-heading-row .c680-section-title { margin-bottom: 0; }
+
+.c680-ws-live-badge {
+  display: inline-flex; align-items: center; gap: 6px; background: #111c2d; color: #fff;
+  font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 20px; text-transform: uppercase;
+  letter-spacing: .4px;
+}
+.c680-ws-live-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: #ff4d4d; display: inline-block;
+  animation: c680-ws-pulse 1.4s ease-in-out infinite;
+}
+@keyframes c680-ws-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .4; transform: scale(.7); }
+}
+
+.c680-ws-wallet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin-bottom: 8px; }
+.c680-ws-wallet-card {
+  border: 1px solid var(--c680-border); border-radius: 8px; padding: 14px 16px; background: var(--c680-cream);
+}
+.c680-ws-wallet-chain {
+  display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+  color: var(--c680-red); margin-bottom: 6px;
+}
+.c680-ws-wallet-label { font-weight: 700; color: var(--c680-navy); font-size: 15px; margin-bottom: 4px; }
+.c680-ws-wallet-address { font-size: 12px; color: var(--c680-gray); font-family: monospace; word-break: break-all; }
+
+.c680-ws-filter-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; align-items: center; }
+
+.c680-ws-big-badge {
+  display: inline-block; font-size: 11px; font-weight: 700; color: var(--c680-red);
+  background: #fff0ef; padding: 1px 6px; border-radius: 4px; margin-left: 4px;
+}
+.c680-ws-row-big { background: #fff8f0; }
+.c680-ws-row-big:hover { background: #fff0e0 !important; }
+
+.c680-ws-pagination { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 16px; }
+.c680-ws-pagination a {
+  padding: 8px 16px; border: 2px solid var(--c680-navy); border-radius: 6px; font-weight: 700;
+  color: var(--c680-navy); text-decoration: none; font-size: 13px;
+}
+.c680-ws-pagination a:hover { background: var(--c680-navy); color: #fff; }
+.c680-ws-page-info { font-size: 13px; color: var(--c680-gray); font-weight: 600; }
+
+@media (max-width: 480px) {
+  .c680-ws-wallet-grid { grid-template-columns: 1fr; }
+}
+
