@@ -215,13 +215,22 @@ class Coin680Whale_Fetcher {
         update_option('coin680whale_last_poll', $latest_ts + 1);
     }
 
-    public static function get_recent($hours = 24, $limit = 100) {
+    public static function get_recent($hours = 24, $limit = 100, $offset = 0) {
         global $wpdb;
         $table = self::table_name();
         $since = gmdate('Y-m-d H:i:s', time() - $hours * HOUR_IN_SECONDS);
         return $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM $table WHERE tx_timestamp >= %s ORDER BY amount_usd DESC LIMIT %d",
-            $since, $limit
+            "SELECT * FROM $table WHERE tx_timestamp >= %s ORDER BY amount_usd DESC LIMIT %d OFFSET %d",
+            $since, $limit, $offset
+        ));
+    }
+
+    public static function count_recent($hours = 24) {
+        global $wpdb;
+        $table = self::table_name();
+        $since = gmdate('Y-m-d H:i:s', time() - $hours * HOUR_IN_SECONDS);
+        return (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM $table WHERE tx_timestamp >= %s", $since
         ));
     }
 
