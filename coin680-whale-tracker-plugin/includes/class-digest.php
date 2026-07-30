@@ -505,6 +505,28 @@ class Coin680Whale_Digest {
         }
         $since = min($since_candidates);
 
+        // Clamp $since so it can never drift arbitrarily far into the past
+        // (added 2026-07-30). Without this, a smaller transaction of a
+        // symbol that already has a bigger unused entry sits neglected
+        // indefinitely -- select_diverse_items() always prefers the larger
+        // one, so the smaller duplicate can go many cycles without ever
+        // being picked or marked used. Since $since is the MIN across ALL
+        // still-unused rows, that one neglected row alone keeps dragging
+        // $since -- and therefore the "(last N hours)" label shown in the
+        // actual tweet -- further into the past every single cycle, even
+        // while posts keep firing on a perfectly healthy 30-50 min cadence.
+        // Confirmed live 2026-07-30: the label climbed from ~25 hours to
+        // ~28.6 hours across several consecutive, genuinely-posted digests.
+        // Clamping means a permanently-starved old row simply stops being
+        // treated as "recent" once older than this window -- it stays
+        // harmless, inert history in the table, just no longer distorts the
+        // label or (via fetch_pool()'s tx_timestamp >= $since filter) get
+        // reconsidered for selection each cycle.
+        $freshness_floor = time() - (self::MAX_WAIT_MINUTES * 2) * MINUTE_IN_SECONDS;
+        if (strtotime($since) < $freshness_floor) {
+            $since = gmdate('Y-m-d H:i:s', $freshness_floor);
+        }
+
         // Stored as a raw Unix timestamp (time()), NOT a MySQL datetime
         // string -- deliberately avoids strtotime() here. A prior version
         // stored/read this via current_time('mysql', true) + strtotime(),
