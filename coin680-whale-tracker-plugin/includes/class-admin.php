@@ -26,6 +26,7 @@ class Coin680Whale_Admin {
         add_action('admin_post_coin680whale_mark_used', array($this, 'handle_mark_used'));
         add_action('admin_post_coin680whale_poll_now', array($this, 'handle_poll_now'));
         add_action('admin_post_coin680multichain_poll_now', array($this, 'handle_multichain_poll_now'));
+        add_action('admin_post_coin680multichain_test_post', array($this, 'handle_multichain_test_post'));
     }
 
     public function add_menu() {
@@ -91,6 +92,17 @@ class Coin680Whale_Admin {
         exit;
     }
 
+    public function handle_multichain_test_post() {
+        check_admin_referer('coin680multichain_test_post');
+        if (!current_user_can('manage_options')) { wp_die('Not allowed.'); }
+        $ok = false;
+        if (class_exists('Coin680Whale_Digest')) {
+            $ok = Coin680Whale_Digest::instance()->post_multichain_test_digest(7);
+        }
+        wp_safe_redirect(add_query_arg($ok ? 'mc_test_queued' : 'mc_test_empty', '1', admin_url('admin.php?page=coin680-whale-tracker')));
+        exit;
+    }
+
     /**
      * Renders a simple "Page X of Y -- Prev / Next" control for one of the
      * two tables. $param is the query-string key so the two tables can
@@ -131,6 +143,8 @@ class Coin680Whale_Admin {
             <?php if (isset($_GET['saved'])) : ?><div class="notice notice-success"><p><?php esc_html_e('Settings saved.', 'coin680-whale-tracker'); ?></p></div><?php endif; ?>
             <?php if (isset($_GET['polled'])) : ?><div class="notice notice-success"><p><?php esc_html_e('Polled Whale Alert.', 'coin680-whale-tracker'); ?></p></div><?php endif; ?>
             <?php if (isset($_GET['mc_polled'])) : ?><div class="notice notice-success"><p><?php esc_html_e('Polled multichain (Etherscan).', 'coin680-whale-tracker'); ?></p></div><?php endif; ?>
+            <?php if (isset($_GET['mc_test_queued'])) : ?><div class="notice notice-success"><p><?php esc_html_e('Multichain test post queued -- it will actually post to X within about 5 minutes via the X Scheduler cron.', 'coin680-whale-tracker'); ?></p></div><?php endif; ?>
+            <?php if (isset($_GET['mc_test_empty'])) : ?><div class="notice notice-warning"><p><?php esc_html_e('No unused multichain transactions in the last 48h to build a test post from -- poll multichain first and try again.', 'coin680-whale-tracker'); ?></p></div><?php endif; ?>
 
             <div class="card" style="max-width:600px;margin-top:16px;">
                 <h2><?php esc_html_e('Whale Alert API Settings', 'coin680-whale-tracker'); ?></h2>
@@ -167,6 +181,11 @@ class Coin680Whale_Admin {
                     <input type="hidden" name="action" value="coin680multichain_poll_now">
                     <?php wp_nonce_field('coin680multichain_poll_now'); ?>
                     <button type="submit" class="button"><?php esc_html_e('Poll Multichain (Etherscan) Now', 'coin680-whale-tracker'); ?></button>
+                </form>
+                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block; margin-left:8px;">
+                    <input type="hidden" name="action" value="coin680multichain_test_post">
+                    <?php wp_nonce_field('coin680multichain_test_post'); ?>
+                    <button type="submit" class="button"><?php esc_html_e('Post Multichain Test Now (up to 7 tokens, X)', 'coin680-whale-tracker'); ?></button>
                 </form>
             </div>
 
