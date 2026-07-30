@@ -82,9 +82,19 @@ class Coin680MultiChain_Fetcher {
         return $settings['etherscan_api_key'] ?? '';
     }
 
-    private function threshold() {
+    /**
+     * Two-tier threshold, same idea as the Whale Alert side: stablecoins
+     * and wrapped BTC/ETH/native tokens use the higher bar (routine, high
+     * liquidity), everything else uses the lower "small token" bar so a
+     * genuinely large move in a smaller token isn't held to the same
+     * threshold as a routine USDT transfer.
+     */
+    private function threshold($price_id) {
         $settings = get_option('coin680whale_settings', array());
-        return isset($settings['multichain_min_value']) ? (int) $settings['multichain_min_value'] : 100000;
+        if (Coin680MultiChain_Labels::is_major_price_id($price_id)) {
+            return isset($settings['multichain_min_value']) ? (int) $settings['multichain_min_value'] : 100000;
+        }
+        return isset($settings['multichain_token_min_value']) ? (int) $settings['multichain_token_min_value'] : 10000;
     }
 
     private function rpc($chainid, $params) {
@@ -255,23 +265,23 @@ class Coin680MultiChain_Fetcher {
             $by_tx[$log['transactionHash']][] = $log;
         }
 
-        $threshold = $this->threshold();
         global $wpdb;
         $table = self::table_name();
 
         foreach ($by_tx as $tx_logs) {
             foreach ($tx_logs as $log) {
-                $this->process_single_transfer($chain, $chainid, $log, $tx_logs, $threshold, $table, $wpdb);
+                $this->process_single_transfer($chain, $chainid, $log, $tx_logs, $table, $wpdb);
             }
         }
     }
 
-    private function process_single_transfer($chain, $chainid, $log, $tx_logs, $threshold, $table, $wpdb) {
+    private function process_single_transfer($chain, $chainid, $log, $tx_logs, $table, $wpdb) {
         $token_address = $log['address'];
         $price_id = Coin680MultiChain_Labels::price_id($chain, $token_address);
         if (!$price_id) {
             return; // unpriced token -- skip rather than guess
         }
+        $threshold = $this->threshold($price_id);
 
         $topics = $log['topics'];
         if (count($topics) < 3) {
