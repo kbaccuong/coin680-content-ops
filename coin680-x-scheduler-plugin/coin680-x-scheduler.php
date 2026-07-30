@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Coin680 X Scheduler
  * Description: Schedules posts to X (Twitter) directly via the X API -- no third-party service, no monthly post cap. Checks for due posts every 5 minutes via WP-Cron.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Coin680
  * License: GPLv2 or later
  * Text Domain: coin680-x-scheduler
@@ -23,10 +23,20 @@ require_once COIN680X_DIR . 'includes/class-admin.php';
 // when wp_schedule_event() first runs.
 add_filter('cron_schedules', array('Coin680X_Queue', 'add_cron_interval'));
 
+const COIN680X_DB_VERSION = '1.0.1';
+
 function coin680x_init() {
     Coin680X_Queue::instance();
     if (is_admin()) {
         Coin680X_Admin::instance();
+    }
+
+    // Re-runs create_table() (safe/idempotent) on sites where this plugin
+    // was already active before the utf8mb4 fix -- forces the queue table's
+    // charset conversion without needing a manual deactivate/reactivate.
+    if (get_option('coin680x_db_version') !== COIN680X_DB_VERSION) {
+        Coin680X_Queue::create_table();
+        update_option('coin680x_db_version', COIN680X_DB_VERSION);
     }
 }
 add_action('plugins_loaded', 'coin680x_init');
