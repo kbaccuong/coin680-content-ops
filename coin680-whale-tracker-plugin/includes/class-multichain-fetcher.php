@@ -537,20 +537,31 @@ class Coin680MultiChain_Fetcher {
         ));
     }
 
-    public static function get_recent($hours = 24, $limit = 100, $offset = 0) {
+    public static function get_recent($hours = 24, $limit = 100, $offset = 0, $chain = null) {
         global $wpdb;
         $table = self::table_name();
         $since = gmdate('Y-m-d H:i:s', time() - $hours * HOUR_IN_SECONDS);
+        if ($chain) {
+            return $wpdb->get_results($wpdb->prepare(
+                "SELECT * FROM $table WHERE tx_timestamp >= %s AND chain = %s ORDER BY amount_usd DESC LIMIT %d OFFSET %d",
+                $since, $chain, $limit, $offset
+            ));
+        }
         return $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM $table WHERE tx_timestamp >= %s ORDER BY amount_usd DESC LIMIT %d OFFSET %d",
             $since, $limit, $offset
         ));
     }
 
-    public static function count_recent($hours = 24) {
+    public static function count_recent($hours = 24, $chain = null) {
         global $wpdb;
         $table = self::table_name();
         $since = gmdate('Y-m-d H:i:s', time() - $hours * HOUR_IN_SECONDS);
+        if ($chain) {
+            return (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM $table WHERE tx_timestamp >= %s AND chain = %s", $since, $chain
+            ));
+        }
         return (int) $wpdb->get_var($wpdb->prepare(
             "SELECT COUNT(*) FROM $table WHERE tx_timestamp >= %s", $since
         ));
