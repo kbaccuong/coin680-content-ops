@@ -602,7 +602,14 @@ class Coin680Whale_Digest {
             return false;
         }
         $bq_table = Coin680Bitquery_Fetcher::table_name();
-        $since = gmdate('Y-m-d H:i:s', time() - 48 * HOUR_IN_SECONDS);
+        // Was 48 hours -- per direct feedback, if posts go out every 30-50
+        // min, the data behind them (even for a manual test post) shouldn't
+        // be able to reach back nearly 2 days. Widened to 2x MAX_WAIT_MINUTES
+        // rather than matching it exactly, purely so this button still
+        // reliably finds something to test with right after a real digest
+        // cycle just cleared the backlog -- not meant to let manual posts
+        // look "old".
+        $since = gmdate('Y-m-d H:i:s', time() - (self::MAX_WAIT_MINUTES * 2) * MINUTE_IN_SECONDS);
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM $bq_table WHERE used_in_digest = 0 AND tx_timestamp >= %s ORDER BY amount_usd DESC LIMIT 300",
             $since
@@ -750,3 +757,4 @@ class Coin680Whale_Digest {
         }
     }
 }
+
