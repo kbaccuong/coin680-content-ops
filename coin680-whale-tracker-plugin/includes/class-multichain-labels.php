@@ -8,12 +8,16 @@
  * fetcher -- we never estimate a price we can't verify, so an unmapped
  * token just doesn't get a $ figure and can't clear the threshold.
  *
- * Only Ethereum/Polygon/Arbitrum are enabled -- that's what the free
- * Etherscan API tier allows (confirmed live: BSC/Base/Optimism/Avalanche
- * all return "Free API access is not supported for this chain" on this
- * key). BSC/Base/Optimism/Avalanche are listed commented-out below --
- * uncomment once the Etherscan key is upgraded to a paid tier, no other
- * code changes needed to bring them online.
+ * Ethereum/Polygon/Arbitrum/BSC/Base/Optimism/Avalanche all enabled --
+ * the free Etherscan tier only allowed the first three (confirmed live:
+ * BSC/Base/Optimism/Avalanche returned "Free API access is not supported
+ * for this chain" on that key); the other four were switched on after the
+ * paid-tier upgrade. Router/stablecoin/token addresses for the newly added
+ * chains are the well-known canonical ones (PancakeSwap on BSC, Uniswap V3
+ * + the fixed OP-stack WETH predeploy on Base/Optimism, Trader Joe/Pangolin
+ * on Avalanche) but haven't been spot-checked against a live tx yet the way
+ * the original three were during the earlier debugging round -- worth
+ * confirming against a block explorer after the first day of real data.
  */
 
 if (!defined('ABSPATH')) {
@@ -38,13 +42,26 @@ class Coin680MultiChain_Labels {
             'label'           => 'Arbitrum',
             'explorer'        => 'https://arbiscan.io/tx/%s',
         ),
-        // Uncomment once the Etherscan API key is upgraded (LITE $49/mo or
-        // higher -- confirmed these return "Free API access is not
-        // supported for this chain" on the free tier):
-        // 'bsc'       => array('chainid' => 56,    'label' => 'BSC',       'explorer' => 'https://bscscan.com/tx/%s'),
-        // 'base'      => array('chainid' => 8453,  'label' => 'Base',      'explorer' => 'https://basescan.org/tx/%s'),
-        // 'optimism'  => array('chainid' => 10,     'label' => 'Optimism',  'explorer' => 'https://optimistic.etherscan.io/tx/%s'),
-        // 'avalanche' => array('chainid' => 43114, 'label' => 'Avalanche', 'explorer' => 'https://snowtrace.io/tx/%s'),
+        'bsc' => array(
+            'chainid'  => 56,
+            'label'    => 'BSC',
+            'explorer' => 'https://bscscan.com/tx/%s',
+        ),
+        'base' => array(
+            'chainid'  => 8453,
+            'label'    => 'Base',
+            'explorer' => 'https://basescan.org/tx/%s',
+        ),
+        'optimism' => array(
+            'chainid'  => 10,
+            'label'    => 'Optimism',
+            'explorer' => 'https://optimistic.etherscan.io/tx/%s',
+        ),
+        'avalanche' => array(
+            'chainid'  => 43114,
+            'label'    => 'Avalanche',
+            'explorer' => 'https://snowtrace.io/tx/%s',
+        ),
     );
 
     /**
@@ -69,6 +86,22 @@ class Coin680MultiChain_Labels {
             '0xc873fecbd354f5a56e00e710b90ef4201db2448d' => 'Camelot',
             '0x1b02da8cb0d097eb8d57a175b88c7d8b47997506' => 'SushiSwap',
             '0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45' => 'Uniswap',
+        ),
+        'bsc' => array(
+            '0x10ed43c718714eb63d5aa57b78b54704e256024e' => 'PancakeSwap',
+            '0x13f4ea83d0bd40e75c8222255bc855a974568dd4' => 'PancakeSwap',
+        ),
+        'base' => array(
+            '0x2626664c2603336e57b271c5c0b26f421741e481' => 'Uniswap',
+            '0x327df1e6de05895d2ab08513aadd9313fe505d86' => 'BaseSwap',
+        ),
+        'optimism' => array(
+            '0x2626664c2603336e57b271c5c0b26f421741e481' => 'Uniswap',
+            '0xa062ae8a9c5e11aaa026fc2670b0d65ccc8b2858' => 'Velodrome',
+        ),
+        'avalanche' => array(
+            '0x60ae616a2155ee3d9a68541ba4544862310933d4' => 'Trader Joe',
+            '0xe54ca86531e17ef3616d22ca28b0d458b6c89106' => 'Pangolin',
         ),
     );
 
@@ -95,6 +128,27 @@ class Coin680MultiChain_Labels {
             '0xaf88d065e77c8cc2239327c5edb3a432268e5831', // USDC (native)
             '0xff970a61a04b1ca14834a43f5de4533ebddb5cc8', // USDC.e (bridged)
             '0xda10009cbd5d07dd0cecc66161fc93d7c9000da1', // DAI
+        ),
+        'bsc' => array(
+            '0x55d398326f99059ff775485246999027b3197955', // USDT
+            '0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d', // USDC
+            '0xe9e7cea3dedca5984780bafc599bd69add087d56', // BUSD
+            '0x1af3f329e8be154074d8769d1ffa4ee058b1dbc3', // DAI
+        ),
+        'base' => array(
+            '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913', // USDC (native)
+            '0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca', // USDbC (bridged)
+            '0x50c5725949a6f0c72e6c4a641f24049a917db0cb', // DAI
+        ),
+        'optimism' => array(
+            '0x0b2c639c533813f4aa9d7837caf62653d097ff85', // USDC (native)
+            '0x94b008aa00579c1307b0ef2c499ad98a8ce58e58', // USDT
+            '0xda10009cbd5d07dd0cecc66161fc93d7c9000da1', // DAI
+        ),
+        'avalanche' => array(
+            '0x9702230a8ea53601f5cd2dc00fdbc13d4df4a8c7', // USDT
+            '0xb97ef9ef8734c71904d8002f8b6bc66dd9c48a6e', // USDC
+            '0xd586e7f844cea2f87f50152665bcbc2c279d8d70', // DAI.e
         ),
     );
 
@@ -130,6 +184,39 @@ class Coin680MultiChain_Labels {
             '0x82af49447d8a07e3bd95bd0d56f35241523fbab1' => 'weth',
             '0x912ce59144191c1204e64559fe8253a0e49e6548' => 'arbitrum',
         ),
+        'bsc' => array(
+            '0x55d398326f99059ff775485246999027b3197955' => 'tether',
+            '0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d' => 'usd-coin',
+            '0xe9e7cea3dedca5984780bafc599bd69add087d56' => 'binance-usd',
+            '0x1af3f329e8be154074d8769d1ffa4ee058b1dbc3' => 'dai',
+            '0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c' => 'wbnb',
+            '0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c' => 'bitcoin',
+            '0x2170ed0880ac9a755fd29b2688956bd959f933f8' => 'ethereum',
+            '0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82' => 'pancakeswap-token',
+        ),
+        'base' => array(
+            '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913' => 'usd-coin',
+            '0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca' => 'usd-coin',
+            '0x50c5725949a6f0c72e6c4a641f24049a917db0cb' => 'dai',
+            '0x4200000000000000000000000000000000000006' => 'weth',
+            '0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf' => 'coinbase-wrapped-btc',
+        ),
+        'optimism' => array(
+            '0x0b2c639c533813f4aa9d7837caf62653d097ff85' => 'usd-coin',
+            '0x94b008aa00579c1307b0ef2c499ad98a8ce58e58' => 'tether',
+            '0xda10009cbd5d07dd0cecc66161fc93d7c9000da1' => 'dai',
+            '0x4200000000000000000000000000000000000006' => 'weth',
+            '0x4200000000000000000000000000000000000042' => 'optimism',
+            '0x68f180fcce6836688e9084f035309e29bf0a2095' => 'wrapped-bitcoin',
+        ),
+        'avalanche' => array(
+            '0x9702230a8ea53601f5cd2dc00fdbc13d4df4a8c7' => 'tether',
+            '0xb97ef9ef8734c71904d8002f8b6bc66dd9c48a6e' => 'usd-coin',
+            '0xd586e7f844cea2f87f50152665bcbc2c279d8d70' => 'dai',
+            '0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7' => 'avalanche-2',
+            '0x49d5c2bdffac6ce2bfdb6640f4f80f226bc10bab' => 'ethereum',
+            '0x50b7545627a5162f82a992c33b87adc75187b218' => 'bitcoin',
+        ),
     );
 
     // keccak256("Transfer(address,address,uint256)") -- the ERC-20 Transfer event signature.
@@ -143,7 +230,7 @@ class Coin680MultiChain_Labels {
      * lower token_min_value threshold instead, so a genuinely large move in
      * a smaller token isn't held to the same bar as a routine USDT transfer.
      */
-    const MAJOR_PRICE_IDS = array('tether', 'usd-coin', 'dai', 'weth', 'wrapped-bitcoin', 'wmatic', 'ethereum', 'bitcoin', 'matic-network');
+    const MAJOR_PRICE_IDS = array('tether', 'usd-coin', 'dai', 'binance-usd', 'weth', 'wrapped-bitcoin', 'coinbase-wrapped-btc', 'wmatic', 'wbnb', 'ethereum', 'bitcoin', 'matic-network', 'binancecoin', 'avalanche-2', 'optimism');
 
     public static function is_major_price_id($price_id) {
         return in_array($price_id, self::MAJOR_PRICE_IDS, true);
