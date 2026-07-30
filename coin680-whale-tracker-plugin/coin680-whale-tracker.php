@@ -122,14 +122,34 @@ function coin680whale_init() {
     // hooks (added 2026-07-30, proactively -- these had the identical
     // "only ever scheduled once" gap that caused the digest cron bug fixed
     // earlier the same day, just never actually confirmed broken live).
-    // coin680bitquery_poll moved from the shared 5-min interval to the new
-    // 2-min one as part of the same change (see coin680whale_add_cron_
-    // interval() above for why 2 min specifically).
+    //
+    // Moved to 2-min briefly the same day, then back to 5-min a few hours
+    // later after the Bitquery usage dashboard showed the paid plan's
+    // 100k-point monthly budget projected to run out ~Aug 13 (17 days
+    // before the Aug 30 renewal) at the 2-min rate -- confirming the
+    // "comfortably within the paid plan's headroom" estimate above was
+    // wrong for this specific plan tier. wp_schedule_event() only takes
+    // effect for an event that ISN'T already scheduled, so simply changing
+    // the interval name passed below wouldn't retroactively fix a site
+    // where coin680bitquery_poll/coin680watchlist_poll were already
+    // scheduled at the 2-min interval -- hence the explicit
+    // wp_get_scheduled_event() + clear step, so this self-heals to the
+    // correct interval on any already-running site without needing a
+    // manual deactivate/reactivate.
+    $coin680_target_interval = 'coin680x_five_minutes';
+    $coin680_bitquery_event = wp_get_scheduled_event('coin680bitquery_poll');
+    if ($coin680_bitquery_event && $coin680_bitquery_event->schedule !== $coin680_target_interval) {
+        wp_clear_scheduled_hook('coin680bitquery_poll');
+    }
     if (!wp_next_scheduled('coin680bitquery_poll')) {
-        wp_schedule_event(time(), 'coin680x_two_minutes', 'coin680bitquery_poll');
+        wp_schedule_event(time(), $coin680_target_interval, 'coin680bitquery_poll');
+    }
+    $coin680_watchlist_event = wp_get_scheduled_event('coin680watchlist_poll');
+    if ($coin680_watchlist_event && $coin680_watchlist_event->schedule !== $coin680_target_interval) {
+        wp_clear_scheduled_hook('coin680watchlist_poll');
     }
     if (!wp_next_scheduled('coin680watchlist_poll')) {
-        wp_schedule_event(time(), 'coin680x_two_minutes', 'coin680watchlist_poll');
+        wp_schedule_event(time(), $coin680_target_interval, 'coin680watchlist_poll');
     }
 }
 add_action('plugins_loaded', 'coin680whale_init');
@@ -188,10 +208,10 @@ function coin680whale_activate() {
         wp_schedule_event(time(), 'daily', 'coin680whale_daily_recap');
     }
     if (!wp_next_scheduled('coin680bitquery_poll')) {
-        wp_schedule_event(time(), 'coin680x_two_minutes', 'coin680bitquery_poll');
+        wp_schedule_event(time(), 'coin680x_five_minutes', 'coin680bitquery_poll');
     }
     if (!wp_next_scheduled('coin680watchlist_poll')) {
-        wp_schedule_event(time(), 'coin680x_two_minutes', 'coin680watchlist_poll');
+        wp_schedule_event(time(), 'coin680x_five_minutes', 'coin680watchlist_poll');
     }
 }
 register_activation_hook(__FILE__, 'coin680whale_activate');
