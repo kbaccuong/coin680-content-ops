@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('COIN680_VERSION', '1.3.6');
+define('COIN680_VERSION', '1.3.7');
 
 /* ==========================================================================
    Theme setup
@@ -902,3 +902,4 @@ function coin680_maybe_affiliate_banner($content) {
     return $content;
 }
 add_filter('the_content', 'coin680_maybe_affiliate_banner');
+
