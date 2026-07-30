@@ -75,6 +75,29 @@ function coin680whale_init() {
     // breaking mega-alerts is unscheduled here, every load, so it can never
     // silently get re-added by some other code path re-registering it.
     wp_clear_scheduled_hook('coin680whale_poll');
+
+    // Self-healing re-check (added 2026-07-30, root-cause fix). Previously
+    // the digest cron was ONLY scheduled once, inside coin680whale_activate()
+    // below (register_activation_hook -- fires ONLY when the plugin is
+    // activated). If that scheduled event is ever lost for any reason
+    // (WP-Cron table flakiness, a hosting-level reset, restoring/moving the
+    // site without reactivating the plugin...) nothing ever put it back,
+    // since nothing outside activation re-verified it. Confirmed as the
+    // actual live cause 2026-07-30: manually forcing wp-cron.php did nothing
+    // even though fresh qualifying Bitquery data was sitting ready, while
+    // the manual "Post Multichain Now" button (which bypasses the cron path
+    // entirely, calling Coin680Whale_Digest::post_multichain_test_digest()
+    // directly) posted successfully -- proving the digest logic and X
+    // pipeline were both fine, only the recurring schedule itself was
+    // missing. This runs on every request (cheap: wp_next_scheduled() is a
+    // single indexed option lookup) so it can never silently stay missing
+    // again without needing a manual deactivate/reactivate.
+    if (!wp_next_scheduled('coin680whale_digest_check')) {
+        wp_schedule_event(time(), 'coin680x_five_minutes', 'coin680whale_digest_check');
+    }
+    if (!wp_next_scheduled('coin680whale_daily_recap')) {
+        wp_schedule_event(time(), 'daily', 'coin680whale_daily_recap');
+    }
 }
 add_action('plugins_loaded', 'coin680whale_init');
 
@@ -140,3 +163,4 @@ function coin680whale_deactivate() {
     wp_clear_scheduled_hook('coin680whale_daily_recap');
 }
 register_deactivation_hook(__FILE__, 'coin680whale_deactivate');
+
