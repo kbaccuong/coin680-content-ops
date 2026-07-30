@@ -78,6 +78,23 @@ sửa: ép `utf8mb4` ngay trong câu lệnh `CREATE TABLE`, thêm `ALTER TABLE .
 SET utf8mb4` chạy 1 lần cho site đang hoạt động (vì `dbDelta()` không tự đổi charset bảng đã tồn
 tại), gắn với bump `COIN680X_DB_VERSION = '1.0.1'` để tự chạy lại mà không cần tắt/bật lại plugin.
 
+**Tính năng mới 2026-07-30 — tự động đăng X khi publish bài News:** file mới
+`includes/class-auto-post.php` (`Coin680X_AutoPost`), hook vào `publish_post` (core WP, chỉ bắn 1
+lần lúc bài chuyển sang publish — cả đăng tay lẫn tự động qua lịch hẹn cron, không bắn lại khi sửa
+bài đã đăng). Chỉ áp dụng cho danh mục đã cấu hình (`auto_tweet_category_id`, mặc định = 2 = Crypto
+Market News; **KHÔNG áp dụng Bitcoin Academy** vì đăng 9 bài/ngày, tự tweet hết sẽ spam kênh). Tự
+build nội dung tweet từ tiêu đề + Excerpt (hoặc tự cắt từ nội dung nếu chưa điền Excerpt) + link +
+`#Crypto #News` — không cần tôi (Claude) soạn tay bài X đi kèm mỗi bài News nữa.
+
+**Sự cố ngay sau khi deploy — WordPress vào "Recovery Mode":** bản đầu tiên của
+`class-auto-post.php` dùng `mb_strlen()`/`mb_substr()` để tính giới hạn 280 ký tự — extension
+`mbstring` không chắc chắn được bật trên mọi cấu hình PHP Hostinger, gọi hàm không tồn tại là lỗi
+PHP fatal, kích hoạt "Recovery Mode" của WordPress (site vẫn vào được wp-admin nhưng cảnh báo lỗi
+liên tục). **Đã sửa:** thêm 2 helper `str_len()`/`str_trim()` tự kiểm tra `function_exists('mb_...')`
+trước, fallback về `strlen`/`substr` thường nếu không có — đảm bảo không bao giờ fatal bất kể môi
+trường. Bài học: tránh dùng thẳng hàm `mb_*` trong code deploy lên hosting không tự kiểm soát được
+cấu hình PHP, trừ khi đã xác nhận extension có sẵn.
+
 ### 4.3. Coin680 Whale Tracker — "Whale Signal" tự động (Bitcoin only từ 2026-07-30)
 Gọi API Whale Alert (v1 REST, `api.whale-alert.io`), tự phân loại giao dịch (Exchange
 Inflow/Outflow/to-Exchange, Mint, Burn, Wallet Transfer) dựa theo nhãn owner_type thật của Whale
@@ -91,15 +108,19 @@ ngay trong `poll()` trước khi lưu vào DB. **Dữ liệu non-Bitcoin cũ đ�
 khỏi bảng `wp_coin680_whale_txns` (dọn dẹp 1 lần khi nâng cấp DB version lên 1.3, theo yêu cầu "xoá
 cho nhẹ").
 
-Tính năng còn lại:
-- **Ngưỡng USD** `min_value` (mặc định $500k) cho BTC — vẫn chỉnh được ở trang admin. Ô
-  `altcoin_min_value` vẫn còn trên form nhưng không còn tác dụng thực tế (Whale Alert chỉ còn BTC) —
-  giữ lại chỉ để dễ revert nếu sau này quay lại nhiều chain qua Whale Alert.
-- **Bật/tắt Whale Alert (Bitcoin) khỏi bài đăng** — checkbox `include_whale_alert_in_digest`, mặc
-  định BẬT, không ảnh hưởng tới việc thu thập dữ liệu nền khi tắt.
-- **Breaking alert tức thời** cho giao dịch ≥$50M (ngưỡng chỉnh được).
-- **Daily Recap** 1 lần/ngày (tổng khối lượng, giao dịch lớn nhất, net flow 24h) — vẫn tính riêng
-  trên bảng Whale Alert (giờ chỉ còn dữ liệu Bitcoin).
+**Đã NGỪNG HẲN (2026-07-30 tối, v1.4.0)** — theo phản hồi trực tiếp: "bài đăng từ whale_alert quá
+dày, bỏ luôn phần này đi, chỉ cần Bitquery là đủ". Cụ thể:
+- **Cron tự động poll bị huỷ lịch** (`wp_clear_scheduled_hook('coin680whale_poll')`, chạy lại mỗi lần
+  WordPress load plugin để không bao giờ bị đăng ký nhầm lại) — không còn tự động lấy dữ liệu mới,
+  cũng đồng nghĩa **breaking mega-alert (≥$50M) không bao giờ tự bắn nữa** (vì cơ chế đó chỉ được gọi
+  từ bên trong `poll()`).
+- **Checkbox "Include Whale Alert (Bitcoin) in posts?" bị ép về TẮT** qua migration 1 lần (không chỉ
+  dựa vào việc admin tự bỏ tick) — bài đăng giờ **chỉ còn Bitquery** (Solana/BSC/Ethereum/TRON).
+- Class/code KHÔNG bị xoá (`class-fetcher.php` vẫn load) — bảng "Whale Alert (Bitcoin) -- Last 24
+  Hours" vẫn hiển thị được ở trang admin (dữ liệu cũ), nút "Poll Whale Alert Now" thủ công vẫn bấm
+  được nếu muốn xem thử — chỉ riêng cơ chế TỰ ĐỘNG (cron + đưa vào bài đăng) là tắt. Muốn bật lại
+  hoàn toàn: xoá dòng `wp_clear_scheduled_hook('coin680whale_poll')` + tick lại checkbox — không cần
+  build lại.
 - Trang admin: **wp-admin → Whale Tracker**.
 
 ### 4.3.1. Coin680 Bitquery Fetcher — Solana / BSC / Ethereum / TRON (thay thế hoàn toàn Etherscan)
@@ -200,8 +221,16 @@ so khớp từ khóa Jaccard similarity trên tiêu đề, đã loại các từ
 - **Không thể tự động hoàn toàn việc viết + đăng bài tin tức/Academy** mà không có tôi trong vòng
   lặp — hệ thống an toàn của Claude Code chặn việc nhúng API key sống vào automation chạy nền
   không giám sát để tự sinh nội dung. Đã thử và bị chặn nhiều lần với các cách tiếp cận khác nhau.
-- **WP-Cron mặc định phụ thuộc traffic** — đã giải quyết bằng GitHub Actions ping mỗi 5 phút
-  (không phụ thuộc máy tính người dùng hay phiên làm việc Claude Code).
+- **WP-Cron mặc định phụ thuộc traffic** — đã giải quyết 1 phần bằng GitHub Actions ping mỗi 5 phút
+  (không phụ thuộc máy tính người dùng hay phiên làm việc Claude Code). **Nhưng đã xác nhận
+  (2026-07-30) lịch `schedule` của GitHub Actions KHÔNG đáng tin cậy ở tần suất dày** — kiểm tra
+  lịch sử chạy thật thấy có khoảng trống hơn 2.5 tiếng dù cấu hình `*/5 * * * *`, do GitHub tự trì
+  hoãn/bỏ bớt job lịch khi ít traffic/ưu tiên thấp (giới hạn đã biết của GitHub, không phải bug cấu
+  hình). Traffic thật của site (khách ghé thăm) cũng vô tình kích hoạt WP-Cron nên phần lớn thời
+  gian vẫn ổn, nhưng **bài Academy/News hẹn giờ có thể trễ vài tiếng nếu rơi đúng lúc traffic thấp
+  + GitHub Actions trì hoãn cùng lúc**. Khuyến nghị chưa triển khai: thêm Cron Job thật qua
+  Hostinger hPanel (Advanced → Cron Jobs) gọi `wp-cron.php` mỗi 5 phút — đáng tin cậy hơn hẳn vì
+  chạy ngay trên server, không qua hàng đợi của GitHub.
 - **Việc đăng X qua tôi (không qua hệ thống tự động Whale/News)** vẫn cần tôi chủ động (không có
   cách đặt lịch xa an toàn ngoài phiên làm việc hiện tại).
 - **Không tạo credential/token thay bạn được** (Akismet, Ayrshare, GitHub PAT với quyền workflow...)
