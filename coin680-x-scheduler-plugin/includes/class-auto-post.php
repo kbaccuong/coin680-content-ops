@@ -105,6 +105,15 @@ class Coin680X_AutoPost {
         }
         $text .= "\n\n{$link}\n\n{$hashtags}";
 
-        Coin680X_Queue::add($text, '', '', current_time('mysql', true));
+        // Use the post's own featured image if one is set -- falls back to
+        // no image (empty string) rather than guessing/fetching anything
+        // else. Coin680X_Queue::upload_media() re-downloads whatever URL is
+        // given and uploads it to X, so any public image URL works here.
+        $media_url = get_the_post_thumbnail_url($post, 'large');
+        if (!$media_url) {
+            $media_url = '';
+        }
+
+        Coin680X_Queue::add($text, $media_url, '', current_time('mysql', true));
     }
 }
