@@ -157,7 +157,7 @@ class Coin680Bitquery_Fetcher {
                 array('Account { Address }', 'Account { Address }'),
                 $fields
             );
-            $query = "{ Solana { DEXTrades(limit: {count: 200} orderBy: {descending: Block_Time} where: {Block: {Time: {since: \"{$since}\" till: \"{$now}\"}} any: [{Trade: {Buy: {AmountInUSD: {gt: \"{$min}\"}}}} {Trade: {Sell: {AmountInUSD: {gt: \"{$min}\"}}}}]}) { Transaction { Signature } Trade { {$trade_fields} } Block { Time } } } }";
+            $query = "{ Solana { DEXTrades(limit: {count: 50} orderBy: {descending: Block_Time} where: {Block: {Time: {since: \"{$since}\" till: \"{$now}\"}} any: [{Trade: {Buy: {AmountInUSD: {gt: \"{$min}\"}}}} {Trade: {Sell: {AmountInUSD: {gt: \"{$min}\"}}}}]}) { Transaction { Signature } Trade { {$trade_fields} } Block { Time } } } }";
         } elseif ($config['query_kind'] === 'evm') {
             $trade_fields = str_replace(
                 array('%ADDR_BUY%', '%ADDR_SELL%'),
@@ -165,10 +165,10 @@ class Coin680Bitquery_Fetcher {
                 $fields
             );
             $network = $config['network'];
-            $query = "{ EVM(network: {$network}) { DEXTrades(limit: {count: 200} orderBy: {descending: Block_Time} where: {Block: {Time: {since: \"{$since}\" till: \"{$now}\"}} any: [{Trade: {Buy: {AmountInUSD: {gt: \"{$min}\"}}}} {Trade: {Sell: {AmountInUSD: {gt: \"{$min}\"}}}}]}) { Transaction { Hash } Trade { {$trade_fields} } Block { Time } } } }";
+            $query = "{ EVM(network: {$network}) { DEXTrades(limit: {count: 50} orderBy: {descending: Block_Time} where: {Block: {Time: {since: \"{$since}\" till: \"{$now}\"}} any: [{Trade: {Buy: {AmountInUSD: {gt: \"{$min}\"}}}} {Trade: {Sell: {AmountInUSD: {gt: \"{$min}\"}}}}]}) { Transaction { Hash } Trade { {$trade_fields} } Block { Time } } } }";
         } else { // tron
             $trade_fields = str_replace(array('%ADDR_BUY%', '%ADDR_SELL%'), array('', ''), $fields);
-            $query = "{ Tron { DEXTrades(limit: {count: 200} orderBy: {descending: Block_Time} where: {Block: {Time: {since: \"{$since}\" till: \"{$now}\"}} any: [{Trade: {Buy: {AmountInUSD: {gt: \"{$min}\"}}}} {Trade: {Sell: {AmountInUSD: {gt: \"{$min}\"}}}}]}) { Transaction { Hash } Trade { {$trade_fields} } Block { Time } } } }";
+            $query = "{ Tron { DEXTrades(limit: {count: 50} orderBy: {descending: Block_Time} where: {Block: {Time: {since: \"{$since}\" till: \"{$now}\"}} any: [{Trade: {Buy: {AmountInUSD: {gt: \"{$min}\"}}}} {Trade: {Sell: {AmountInUSD: {gt: \"{$min}\"}}}}]}) { Transaction { Hash } Trade { {$trade_fields} } Block { Time } } } }";
         }
 
         $data = $this->gql($query);
