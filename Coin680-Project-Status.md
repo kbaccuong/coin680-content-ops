@@ -78,24 +78,30 @@ Alert — **có nêu tên sàn cụ thể khi Whale Alert gắn nhãn** (vd "mov
 
 Tính năng:
 - **KHÔNG còn mốc thời gian cố định** (đổi 2026-07-29 tối, thay cho "tối đa 30 phút/bài" trước đó
-  theo yêu cầu ban đầu) — giờ **chỉ đăng khi gom đủ 6 coin khác nhau** (không quan tâm mất bao lâu),
+  theo yêu cầu ban đầu) — giờ **chỉ đăng khi gom đủ 3 coin khác nhau** (không quan tâm mất bao lâu),
   ưu tiên nội dung phong phú hơn tần suất cố định. Vẫn kiểm tra mỗi 5 phút qua cron, nhưng chỉ thực
   sự đăng khi đủ điều kiện. Tiêu đề bài tự tính đúng khoảng thời gian thực tế (vd "last 47 min")
   thay vì hiển thị cố định "30 min".
 - **Chọn đa dạng COIN trước, loại giao dịch sau, KHÔNG BAO GIỜ trùng coin trong 1 bài** (sửa
   2026-07-29 tối, 2 lần — lần đầu còn bug để lọt trùng coin ở bước lấp chỗ trống, đã vá) — lấy giao
   dịch lớn nhất của MỖI coin khác nhau trong pool (tối đa 60 giao dịch top theo USD), tối đa
-  **6 coin/bài**, không đủ 6 thì đăng ít hơn chứ không lặp coin để lấp đầy. Lý do: BTC/ETH/USDT/USDC
+  **3 coin/bài** (hạ từ 6→3 ngày 30/07 theo yêu cầu — đăng thường xuyên hơn), không đủ 3 thì đăng
+  ít hơn chứ không lặp coin để lấp đầy. Lý do: BTC/ETH/USDT/USDC
   luôn có nhiều giao dịch >$500k hơn hẳn altcoin trong bất kỳ khung giờ nào, nên nếu chỉ ưu tiên
   theo classification hoặc size thô, các coin lớn sẽ chiếm hết chỗ, altcoin dù đủ điều kiện cũng
   không bao giờ được đăng. Người dùng phản hồi thấy dữ liệu "nhàm chán, chỉ toàn BTC/USDT/ETH"
   trước khi sửa.
-- **Ngưỡng USD tách riêng theo nhóm coin** (thêm 2026-07-29 tối): BTC/ETH/USDT/USDC dùng ngưỡng
-  `min_value` (mặc định $500k), **mọi coin khác dùng ngưỡng `altcoin_min_value` thấp hơn hẳn
-  (mặc định $300k)** — vì nếu dùng chung 1 ngưỡng, altcoin hiếm khi đủ lớn để lọt qua so với
-  BTC/USDT. Whale Alert API chỉ nhận 1 `min_value` toàn cục nên code luôn gọi API ở ngưỡng THẤP
-  HƠN trong 2 ngưỡng, rồi tự lọc lại theo từng nhóm coin trước khi lưu vào DB. Cả 2 ngưỡng chỉnh
-  được ở trang admin.
+- **Ngưỡng USD tách riêng theo nhóm coin** (thêm 2026-07-29 tối, hạ xuống $100k ngày 30/07): BTC/
+  ETH/USDT/USDC dùng ngưỡng `min_value` (mặc định $500k), **mọi coin khác dùng ngưỡng
+  `altcoin_min_value` = $100k** — đây là **mức sàn cứng của chính API Whale Alert** (đã test trực
+  tiếp: gọi API với ngưỡng thấp hơn bị chính Whale Alert từ chối "value out of range"), không phải
+  do code tự giới hạn — không thể hạ thấp hơn được nữa với gói Whale Alert hiện tại. Whale Alert
+  API chỉ nhận 1 `min_value` toàn cục nên code luôn gọi API ở ngưỡng THẤP HƠN trong 2 ngưỡng, rồi tự
+  lọc lại theo từng nhóm coin trước khi lưu vào DB. Cả 2 ngưỡng chỉnh được ở trang admin.
+- **Whale Alert KHÔNG có BSC hoặc Solana** (xác nhận qua endpoint `/status`: chỉ 15 blockchain, hầu
+  hết chain cũ — Bitcoin, Ethereum, Ripple, Tron, EOS, Stellar, NEO, Tezos, Cosmos, ICON, Hive,
+  Steem, Liquid, và "binancechain" — đây là Binance Chain cũ BEP2, KHÔNG phải BSC/BEP20 hiện tại).
+  Đây là gốc rễ của tính năng multichain mới bên dưới.
 - **Không còn poll/first-comment kèm bài** (bỏ 2026-07-29 tối, theo phản hồi trực tiếp: "đơn bị
   spam kênh") — mỗi chu kỳ giờ chỉ đăng **1 bài duy nhất**, không có reply/poll nữa. (Bài mega
   alert và daily recap vốn đã không có poll từ trước, không đổi.)
@@ -108,6 +114,49 @@ Tính năng:
 - Tiêu đề: `🐋 #COIN680 WHALE SIGNAL` (viết hoa), có link tx thật cho mỗi giao dịch.
 - Trang admin: **wp-admin → Whale Tracker** (cấu hình key, 2 ngưỡng min_value, mega threshold, xem
   24h gần nhất).
+
+### 4.3.1. Coin680 Multichain Fetcher — mở rộng Ethereum/Polygon/Arbitrum (mới, 2026-07-30)
+
+**Lý do xây:** Whale Alert không có BSC/Solana (xem trên). User hỏi mua API riêng cho BSC (BscScan)
+— phát hiện Etherscan.io đã hợp nhất **1 API cho 60+ chain EVM** (đổi tham số `chainid`), rẻ hơn và
+gọn hơn nhiều API riêng lẻ. **Đã test trực tiếp bằng key thật của user (gói Free):**
+- ✅ Dùng được: Ethereum (chainid=1), Polygon (137), Arbitrum (42161)
+- ❌ KHÔNG dùng được ở gói Free (báo lỗi "Free API access is not supported for this chain"): BSC
+  (56), Base (8453), Optimism (10), Avalanche (43114) — cần nâng lên gói **LITE $49/tháng** mới có
+  "All supported chains". User đã đồng ý: **build thử với 3 chain free trước, nâng cấp Etherscan
+  sau khi hài lòng** (không cần build lại từ đầu, chỉ cần bỏ comment 4 chain còn lại trong
+  `class-multichain-labels.php::CHAINS` sau khi nâng cấp).
+
+**File mới:**
+- `includes/class-multichain-labels.php` — cấu hình tĩnh: danh sách chain bật/tắt, địa chỉ router
+  DEX đã biết (Uniswap, SushiSwap, QuickSwap, Camelot), địa chỉ stablecoin đã biết (dùng để đọc
+  hướng swap mua/bán), và bảng ánh xạ token → CoinGecko ID (token không có trong bảng này bị BỎ QUA
+  hoàn toàn — không bao giờ đoán giá).
+- `includes/class-multichain-fetcher.php` — quét `eth_getLogs` bắt sự kiện Transfer trên toàn chain
+  (hiệu quả, không quét từng giao dịch), phân loại 3 tầng: **DEX Buy/Sell/Swap** (đối chiếu router
+  đã biết + hướng di chuyển so với router để biết mua hay bán) → **Exchange Inflow/Outflow** (đối
+  chiếu địa chỉ với dữ liệu ĐÃ CÓ NHÃN từ Whale Alert — xem bên dưới) → **Wallet Transfer**.
+
+**Cải tiến kèm theo trên `class-fetcher.php` (Whale Alert):** giờ lưu thêm `from_address`/
+`to_address` thật (trước đây chỉ lưu tên chủ sở hữu, không lưu địa chỉ) — vì địa chỉ ví EVM dùng
+chung định dạng trên mọi chain, 1 ví từng được Whale Alert gắn nhãn "Binance" trên Ethereum có thể
+đối chiếu lại trên Polygon/Arbitrum/BSC sau này. **Chỉ tích luỹ được từ bây giờ trở đi** (không hồi
+cứu được dữ liệu cũ), và **không phải sàn nào cũng dùng chung địa chỉ giữa các chain** — chỉ bắt
+được một phần, không đầy đủ như Whale Alert tự có trên chain gốc của nó.
+
+**`class-digest.php`** đã sửa để gộp dữ liệu từ CẢ 2 nguồn (Whale Alert + Multichain) khi chọn bài
+đăng — không trùng coin dù coin đó xuất hiện ở nhiều chain khác nhau (ưu tiên volume lớn hơn), mỗi
+dòng bài đăng giờ ghi rõ tên chain (vd "(Ethereum)", "(Polygon)").
+
+**Giới hạn đã biết (MVP, chưa làm ở bản này):**
+- Chỉ bắt token ERC-20/BEP-20 (Transfer event) — **chưa bắt giao dịch coin gốc** (ETH/MATIC/ARB tự
+  thân chuyển khoản) — việc này cần quét toàn bộ block, để dành làm sau.
+- Danh sách token có giá (CoinGecko) còn ít (~7 token/chain: USDT, USDC, DAI, WETH, WBTC, và 1-2 mã
+  riêng mỗi chain) — mở rộng dần theo thời gian khi thấy token nào bị bỏ qua mà muốn có.
+- Nhãn sàn CEX cho EVM chain mới **không đầy đủ bằng Whale Alert** (tự đối chiếu, không phải nhãn
+  chính thức) — DEX thì nhận diện chính xác cao (địa chỉ router cố định, công khai).
+- Trang admin: cùng trang **Whale Tracker**, thêm ô nhập Etherscan API key + ngưỡng riêng
+  ($100k mặc định) + nút "Poll Multichain (Etherscan) Now" + bảng xem dữ liệu 24h riêng.
 
 ### 4.4. Coin680 News Monitor — quét tin tức 2 nguồn
 Tự động lấy RSS feed CoinDesk + Cointelegraph mỗi 5 phút, lưu tiêu đề/link/tóm tắt vào bảng
