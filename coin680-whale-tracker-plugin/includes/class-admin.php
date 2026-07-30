@@ -28,6 +28,8 @@ class Coin680Whale_Admin {
         add_action('admin_post_coin680whale_poll_now', array($this, 'handle_poll_now'));
         add_action('admin_post_coin680bitquery_poll_now', array($this, 'handle_bitquery_poll_now'));
         add_action('admin_post_coin680multichain_test_post', array($this, 'handle_multichain_test_post'));
+        add_action('admin_post_coin680watchlist_add', array($this, 'handle_watchlist_add'));
+        add_action('admin_post_coin680watchlist_remove', array($this, 'handle_watchlist_remove'));
     }
 
     public function add_menu() {
@@ -104,6 +106,28 @@ class Coin680Whale_Admin {
         exit;
     }
 
+    public function handle_watchlist_add() {
+        check_admin_referer('coin680watchlist_add');
+        if (!current_user_can('manage_options')) { wp_die('Not allowed.'); }
+        $chain = sanitize_key($_POST['wl_chain'] ?? '');
+        $address = sanitize_text_field(wp_unslash($_POST['wl_address'] ?? ''));
+        $label = sanitize_text_field(wp_unslash($_POST['wl_label'] ?? ''));
+        $ok = class_exists('Coin680Watchlist') ? Coin680Watchlist::add($chain, $address, $label) : false;
+        wp_safe_redirect(add_query_arg($ok ? 'wl_added' : 'wl_error', '1', admin_url('admin.php?page=coin680-whale-tracker')));
+        exit;
+    }
+
+    public function handle_watchlist_remove() {
+        check_admin_referer('coin680watchlist_remove');
+        if (!current_user_can('manage_options')) { wp_die('Not allowed.'); }
+        $id = (int) ($_POST['wl_id'] ?? 0);
+        if ($id && class_exists('Coin680Watchlist')) {
+            Coin680Watchlist::remove($id);
+        }
+        wp_safe_redirect(add_query_arg('wl_removed', '1', admin_url('admin.php?page=coin680-whale-tracker')));
+        exit;
+    }
+
     /**
      * Renders a simple "Page X of Y -- Prev / Next" control for one of the
      * two tables. $param is the query-string key so the two tables can
@@ -146,6 +170,9 @@ class Coin680Whale_Admin {
             <?php if (isset($_GET['bq_polled'])) : ?><div class="notice notice-success"><p><?php esc_html_e('Polled Bitquery (Solana/BSC/Ethereum/TRON).', 'coin680-whale-tracker'); ?></p></div><?php endif; ?>
             <?php if (isset($_GET['mc_test_queued'])) : ?><div class="notice notice-success"><p><?php esc_html_e('Post queued -- it will actually post to X within about 5 minutes via the X Scheduler cron.', 'coin680-whale-tracker'); ?></p></div><?php endif; ?>
             <?php if (isset($_GET['mc_test_empty'])) : ?><div class="notice notice-warning"><p><?php esc_html_e('No unused Bitquery transactions in the last 48h to build a post from -- poll Bitquery first and try again.', 'coin680-whale-tracker'); ?></p></div><?php endif; ?>
+            <?php if (isset($_GET['wl_added'])) : ?><div class="notice notice-success"><p><?php esc_html_e('Wallet added to watchlist.', 'coin680-whale-tracker'); ?></p></div><?php endif; ?>
+            <?php if (isset($_GET['wl_error'])) : ?><div class="notice notice-error"><p><?php esc_html_e('Could not add wallet -- check the chain and address are both filled in.', 'coin680-whale-tracker'); ?></p></div><?php endif; ?>
+            <?php if (isset($_GET['wl_removed'])) : ?><div class="notice notice-success"><p><?php esc_html_e('Wallet removed from watchlist.', 'coin680-whale-tracker'); ?></p></div><?php endif; ?>
 
             <div class="card" style="max-width:600px;margin-top:16px;">
                 <h2><?php esc_html_e('API Settings', 'coin680-whale-tracker'); ?></h2>
@@ -283,7 +310,107 @@ class Coin680Whale_Admin {
                 <?php $this->render_pager('bq_page', $bq_page, $bq_total, self::PER_PAGE); ?>
             </div>
             <?php endif; ?>
+
+            <?php if (class_exists('Coin680Watchlist')) :
+                $watched = Coin680Watchlist::get_all(true);
+            ?>
+            <div class="card" style="max-width:900px;margin-top:16px;">
+                <h2><?php esc_html_e('Watched Wallets ("Smart Money")', 'coin680-whale-tracker'); ?></h2>
+                <p class="description"><?php esc_html_e('Add specific wallet addresses to watch. Unlike the tables above (which flag ANY large transaction), a watched wallet is flagged for what it does regardless of size -- checked every 2 minutes alongside the main Bitquery poll, Solana/BSC/Ethereum only (see class-watchlist-fetcher.php docblock for why TRON is not supported here).', 'coin680-whale-tracker'); ?></p>
+                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                    <input type="hidden" name="action" value="coin680watchlist_add">
+                    <?php wp_nonce_field('coin680watchlist_add'); ?>
+                    <table class="form-table">
+                        <tr>
+                            <th><?php esc_html_e('Chain', 'coin680-whale-tracker'); ?></th>
+                            <td>
+                                <select name="wl_chain">
+                                    <?php foreach (Coin680Bitquery_Labels::CHAINS as $key => $cfg) :
+                                        if (!in_array($cfg['query_kind'], array('solana', 'evm'), true)) { continue; }
+                                    ?>
+                                        <option value="<?php echo esc_attr($key); ?>"><?php echo esc_html($cfg['label']); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr><th><?php esc_html_e('Wallet Address', 'coin680-whale-tracker'); ?></th><td><input type="text" name="wl_address" style="width:100%;" required placeholder="0x... or a Solana base58 address"></td></tr>
+                        <tr><th><?php esc_html_e('Label (optional)', 'coin680-whale-tracker'); ?></th><td><input type="text" name="wl_label" style="width:100%;" placeholder="e.g. \"Fund X treasury\""></td></tr>
+                    </table>
+                    <p><button type="submit" class="button button-primary"><?php esc_html_e('Add Wallet', 'coin680-whale-tracker'); ?></button></p>
+                </form>
+
+                <table class="widefat striped" style="margin-top:12px;">
+                    <thead><tr>
+                        <th><?php esc_html_e('Chain', 'coin680-whale-tracker'); ?></th>
+                        <th><?php esc_html_e('Address', 'coin680-whale-tracker'); ?></th>
+                        <th><?php esc_html_e('Label', 'coin680-whale-tracker'); ?></th>
+                        <th><?php esc_html_e('Added', 'coin680-whale-tracker'); ?></th>
+                        <th></th>
+                    </tr></thead>
+                    <tbody>
+                    <?php foreach ($watched as $w) :
+                        $cfg = Coin680Bitquery_Labels::chain_config($w->chain);
+                    ?>
+                        <tr>
+                            <td><?php echo esc_html($cfg['label'] ?? ucfirst($w->chain)); ?></td>
+                            <td><small><?php echo esc_html($w->address); ?></small></td>
+                            <td><?php echo esc_html($w->label); ?></td>
+                            <td><?php echo esc_html($w->created_at); ?></td>
+                            <td>
+                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline;">
+                                    <input type="hidden" name="action" value="coin680watchlist_remove">
+                                    <input type="hidden" name="wl_id" value="<?php echo esc_attr($w->id); ?>">
+                                    <?php wp_nonce_field('coin680watchlist_remove'); ?>
+                                    <button type="submit" class="button button-small"><?php esc_html_e('Remove', 'coin680-whale-tracker'); ?></button>
+                                </form>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($watched)) : ?>
+                        <tr><td colspan="5"><?php esc_html_e('No wallets watched yet -- add one above.', 'coin680-whale-tracker'); ?></td></tr>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <?php if (class_exists('Coin680Watchlist_Fetcher')) :
+                $sm_page = max(1, (int) ($_GET['sm_page'] ?? 1));
+                $sm_total = Coin680Watchlist_Fetcher::count_recent(72);
+                $sm_items = Coin680Watchlist_Fetcher::get_recent(72, self::PER_PAGE, ($sm_page - 1) * self::PER_PAGE);
+            ?>
+            <div class="card" style="max-width:1100px;margin-top:16px;">
+                <h2><?php esc_html_e('Smart Money Moves -- Last 72 Hours', 'coin680-whale-tracker'); ?></h2>
+                <table class="widefat striped">
+                    <thead><tr>
+                        <th><?php esc_html_e('Time (UTC)', 'coin680-whale-tracker'); ?></th>
+                        <th><?php esc_html_e('Wallet', 'coin680-whale-tracker'); ?></th>
+                        <th><?php esc_html_e('Chain', 'coin680-whale-tracker'); ?></th>
+                        <th><?php esc_html_e('Action', 'coin680-whale-tracker'); ?></th>
+                        <th><?php esc_html_e('Amount (USD)', 'coin680-whale-tracker'); ?></th>
+                        <th><?php esc_html_e('Alerted?', 'coin680-whale-tracker'); ?></th>
+                    </tr></thead>
+                    <tbody>
+                    <?php foreach ($sm_items as $item) : ?>
+                        <tr>
+                            <td><?php echo esc_html($item->tx_timestamp); ?></td>
+                            <td><?php echo esc_html($item->wallet_label ?: (substr($item->wallet_address, 0, 6) . '...')); ?></td>
+                            <td><?php echo esc_html(ucfirst($item->chain)); ?></td>
+                            <td><?php echo $item->side === 'buy' ? esc_html__('Bought', 'coin680-whale-tracker') : esc_html__('Sold', 'coin680-whale-tracker'); ?> <?php echo esc_html(strtoupper($item->symbol)); ?><?php echo $item->counter_symbol ? ' <small>for ' . esc_html($item->counter_symbol) . '</small>' : ''; ?></td>
+                            <td>$<?php echo esc_html(number_format($item->amount_usd)); ?></td>
+                            <td><?php echo $item->alerted ? '✓' : ''; ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($sm_items)) : ?>
+                        <tr><td colspan="6"><?php esc_html_e('No smart-money moves recorded yet -- add a wallet above and wait for the next poll cycle (every ~2 min).', 'coin680-whale-tracker'); ?></td></tr>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
+                <?php $this->render_pager('sm_page', $sm_page, $sm_total, self::PER_PAGE); ?>
+            </div>
+            <?php endif; ?>
+            <?php endif; ?>
         </div>
         <?php
     }
 }
+
