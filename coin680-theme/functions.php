@@ -458,7 +458,7 @@ function coin680_category_section($title, $slug, $count = 4) {
         <div class="c680-card-grid">
             <?php if ($query->have_posts()) : ?>
                 <?php while ($query->have_posts()) : $query->the_post(); ?>
-                    <?php get_template_part('template-parts/card', null, array('variant' => 'standard')); ?>
+                    <?php get_template_part('template-parts/card', null, array('variant' => 'standard', 'cat_name' => $title)); ?>
                 <?php endwhile; ?>
             <?php else : ?>
                 <p><?php esc_html_e('New articles for this section are coming soon.', 'coin680'); ?></p>
