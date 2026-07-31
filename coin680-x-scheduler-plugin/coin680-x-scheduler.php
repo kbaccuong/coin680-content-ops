@@ -18,6 +18,7 @@ require_once COIN680X_DIR . 'includes/class-oauth.php';
 require_once COIN680X_DIR . 'includes/class-queue.php';
 require_once COIN680X_DIR . 'includes/class-admin.php';
 require_once COIN680X_DIR . 'includes/class-auto-post.php';
+require_once COIN680X_DIR . 'includes/class-rest.php';
 
 // Registered at file-load time (not deferred to plugins_loaded) so the
 // custom interval is recognized even during the activation request itself,
@@ -29,6 +30,7 @@ const COIN680X_DB_VERSION = '1.0.1';
 function coin680x_init() {
     Coin680X_Queue::instance();
     Coin680X_AutoPost::instance();
+    Coin680X_Rest::instance();
     if (is_admin()) {
         Coin680X_Admin::instance();
     }
