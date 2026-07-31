@@ -15,8 +15,17 @@
  * excerpt) -- no AI call, no external composition step, so it works the
  * same whether the post was written by Claude or anyone else. Uses the
  * post's Excerpt field if set (falls back to a trimmed plain-text version
- * of the content) to leave room for hashtags within X's 280-character
- * limit.
+ * of the content).
+ *
+ * Does NOT squeeze the summary down to fit X's classic 280-character
+ * limit -- the @coin680 account is on X Premium, which supports long-form
+ * posts well beyond 280 chars via the same API call (no special payload
+ * needed), so a curated, complete 300-600 char excerpt is used as-is
+ * rather than being cut off mid-sentence with "..." (changed 2026-07-31
+ * after that exact truncation showed up in a live tweet and was flagged:
+ * "tôi yêu cầu là 1 bài tóm tắt hoàn chỉnh mà"). Only a generous sanity
+ * cap ($MAX_SUMMARY_LEN) still applies, to stop a runaway/malformed
+ * excerpt from producing an absurdly long post.
  *
  * Deliberately DOES NOT include the article link in the tweet text
  * (changed 2026-07-31, per direct cost request). X's pay-per-use API
@@ -96,16 +105,13 @@ class Coin680X_AutoPost {
 
         $hashtags = '#Crypto #News';
 
-        // Fit within 280 chars: title + hashtags are fixed cost, the
-        // summary is trimmed to whatever room is left. No link is
-        // included (see docblock) -- posts with a URL are billed at
-        // $0.20 vs. $0.015 for a plain post on X's pay-per-use API.
-        $fixed_cost = $this->str_len($title) + $this->str_len($hashtags) + 6; // +6 for spacing/newlines
-        $summary_budget = max(0, 280 - $fixed_cost);
-        if ($summary_budget < 20) {
-            $summary = ''; // no room left -- title + hashtags alone
-        } elseif ($this->str_len($summary) > $summary_budget) {
-            $summary = $this->str_trim($summary, $summary_budget - 1) . '...';
+        // Sanity cap only -- X Premium (@coin680's plan) supports long-form
+        // posts, so we don't need to squeeze into the classic 280-char
+        // limit. This just stops a malformed/oversized excerpt from
+        // producing an absurdly long post.
+        $max_summary_len = 600;
+        if ($this->str_len($summary) > $max_summary_len) {
+            $summary = $this->str_trim($summary, $max_summary_len - 1) . '...';
         }
 
         $text = $title;
