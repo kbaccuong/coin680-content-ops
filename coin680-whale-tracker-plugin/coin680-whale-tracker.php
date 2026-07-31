@@ -95,25 +95,26 @@ function coin680whale_init() {
     // silently get re-added by some other code path re-registering it.
     wp_clear_scheduled_hook('coin680whale_poll');
 
-    // Self-healing re-check (added 2026-07-30, root-cause fix). Previously
-    // the digest cron was ONLY scheduled once, inside coin680whale_activate()
-    // below (register_activation_hook -- fires ONLY when the plugin is
-    // activated). If that scheduled event is ever lost for any reason
-    // (WP-Cron table flakiness, a hosting-level reset, restoring/moving the
-    // site without reactivating the plugin...) nothing ever put it back,
-    // since nothing outside activation re-verified it. Confirmed as the
-    // actual live cause 2026-07-30: manually forcing wp-cron.php did nothing
-    // even though fresh qualifying Bitquery data was sitting ready, while
-    // the manual "Post Multichain Now" button (which bypasses the cron path
-    // entirely, calling Coin680Whale_Digest::post_multichain_test_digest()
-    // directly) posted successfully -- proving the digest logic and X
-    // pipeline were both fine, only the recurring schedule itself was
-    // missing. This runs on every request (cheap: wp_next_scheduled() is a
-    // single indexed option lookup) so it can never silently stay missing
-    // again without needing a manual deactivate/reactivate.
-    if (!wp_next_scheduled('coin680whale_digest_check')) {
-        wp_schedule_event(time(), 'coin680x_five_minutes', 'coin680whale_digest_check');
-    }
+    // Digest-check cron (the periodic job that composes + posts the
+    // on-chain "whale signal" tweet from Bitquery data) is STOPPED as of
+    // 2026-07-31 -- per direct feedback: tweeting on-chain data to X was
+    // running up real X API billing (~$26 incurred), separate from and
+    // unrelated to the Bitquery cost fixed earlier the same day. Bitquery
+    // polling (coin680bitquery_poll/coin680watchlist_poll below) keeps
+    // running unchanged -- it feeds the public /whale-signals/ page
+    // directly from the database and does NOT go through this digest/X
+    // pipeline, so stopping tweets here has zero effect on Bitquery usage
+    // or on the website feature. Same permanent-disable pattern as
+    // coin680whale_poll above (unconditional clear on every load, no
+    // self-healing re-schedule) so it can't silently come back. The class
+    // itself stays loaded (Coin680Whale_Digest::instance() still runs,
+    // manual "test digest" buttons in admin still work) -- only this
+    // recurring auto-post schedule is off. To re-enable: replace this
+    // wp_clear_scheduled_hook() call with the self-healing
+    // wp_next_scheduled()/wp_schedule_event() pair it used to be (see git
+    // history / GitHub for the prior version) -- no rebuild needed.
+    wp_clear_scheduled_hook('coin680whale_digest_check');
+
     if (!wp_next_scheduled('coin680whale_daily_recap')) {
         wp_schedule_event(time(), 'daily', 'coin680whale_daily_recap');
     }
@@ -213,9 +214,11 @@ function coin680whale_activate() {
     Coin680Watchlist::create_table();
     Coin680Watchlist_Fetcher::create_table();
     update_option('coin680whale_db_version', COIN680WHALE_DB_VERSION);
-    if (!wp_next_scheduled('coin680whale_digest_check')) {
-        wp_schedule_event(time(), 'coin680x_five_minutes', 'coin680whale_digest_check');
-    }
+    // coin680whale_digest_check deliberately NOT scheduled here -- on-chain
+    // X auto-posting is stopped as of 2026-07-31 (see coin680whale_init()
+    // above for why). Scheduling it here would be immediately undone by
+    // that unconditional wp_clear_scheduled_hook() on the very next load
+    // anyway, so leaving it out is just less misleading to read.
     if (!wp_next_scheduled('coin680whale_daily_recap')) {
         wp_schedule_event(time(), 'daily', 'coin680whale_daily_recap');
     }
