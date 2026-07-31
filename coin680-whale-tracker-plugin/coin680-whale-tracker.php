@@ -124,6 +124,15 @@ function coin680whale_init() {
         wp_schedule_event(time(), 'coin680x_five_minutes', 'coin680whale_teaser_check');
     }
 
+    // Once-daily on-chain roundup (2026-07-31) -- the paid-link counterpart
+    // to the free-form teaser above. Fires once/day via WP's native 'daily'
+    // schedule (Coin680Whale_Digest::post_daily_roundup() has no internal
+    // wait-floor logic, unlike the teaser, since this cron itself already
+    // only fires once/day).
+    if (!wp_next_scheduled('coin680whale_roundup_daily')) {
+        wp_schedule_event(time(), 'daily', 'coin680whale_roundup_daily');
+    }
+
     if (!wp_next_scheduled('coin680whale_daily_recap')) {
         wp_schedule_event(time(), 'daily', 'coin680whale_daily_recap');
     }
@@ -231,6 +240,9 @@ function coin680whale_activate() {
     if (!wp_next_scheduled('coin680whale_teaser_check')) {
         wp_schedule_event(time(), 'coin680x_five_minutes', 'coin680whale_teaser_check');
     }
+    if (!wp_next_scheduled('coin680whale_roundup_daily')) {
+        wp_schedule_event(time(), 'daily', 'coin680whale_roundup_daily');
+    }
     if (!wp_next_scheduled('coin680whale_daily_recap')) {
         wp_schedule_event(time(), 'daily', 'coin680whale_daily_recap');
     }
@@ -255,6 +267,7 @@ function coin680whale_deactivate() {
     wp_clear_scheduled_hook('coin680watchlist_poll');
     wp_clear_scheduled_hook('coin680whale_daily_cleanup');
     wp_clear_scheduled_hook('coin680whale_teaser_check');
+    wp_clear_scheduled_hook('coin680whale_roundup_daily');
 }
 register_deactivation_hook(__FILE__, 'coin680whale_deactivate');
 
