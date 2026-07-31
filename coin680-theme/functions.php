@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('COIN680_VERSION', '1.3.9');
+define('COIN680_VERSION', '1.4.0');
 
 /* ==========================================================================
    Theme setup
@@ -892,14 +892,22 @@ const COIN680_WS_PER_PAGE = 60;
 const COIN680_WS_HOURS = 168; // 7 days of browsable history
 
 /**
- * 15s transient cache, keyed by the exact chain/type/page combo. The
- * underlying Bitquery data itself only changes once per 2-minute cron poll,
- * so a 15s cache costs zero real freshness -- but it means any number of
- * visitors polling the ~20s auto-refresh within the same 15s window share
- * ONE database query instead of one each, which is the only meaningful
- * traffic-driven cost of the live page (Bitquery itself is polled on a
- * fixed cron schedule, completely decoupled from visitor count -- see
- * coin680bitquery_poll / coin680watchlist_poll in the plugin bootstrap).
+ * Transient cache, keyed by the exact chain/type/page combo. The underlying
+ * Bitquery data itself only changes once per 5-minute cron poll, so this
+ * costs zero real freshness -- but it means any number of visitors polling
+ * the auto-refresh within the same cache window share ONE database query
+ * instead of one each, which is the only meaningful traffic-driven cost of
+ * the live page (Bitquery itself is polled on a fixed cron schedule,
+ * completely decoupled from visitor count -- see coin680bitquery_poll /
+ * coin680watchlist_poll in the plugin bootstrap).
+ *
+ * Widened from 15s to 45s and the JS poll from 20s to 60s together on
+ * 2026-07-31, after a live concurrency test (direct parallel requests
+ * against this exact REST route) showed ~500 errors appearing at 20-25
+ * simultaneous requests, most likely full-WP-bootstrap-per-request cost
+ * (this plan's single CPU core serializes that work) rather than the cache
+ * itself -- widening the poll interval directly cuts how many requests
+ * arrive per minute per visitor, independent of the cache.
  */
 function coin680_ws_query_signals($chain, $type, $page) {
     if (!class_exists('Coin680Bitquery_Fetcher')) {
@@ -925,7 +933,7 @@ function coin680_ws_query_signals($chain, $type, $page) {
         'pages' => max(1, (int) ceil($total / COIN680_WS_PER_PAGE)),
         'page'  => $page,
     );
-    set_transient($cache_key, $result, 15);
+    set_transient($cache_key, $result, 45);
     return $result;
 }
 
