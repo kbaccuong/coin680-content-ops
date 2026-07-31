@@ -105,10 +105,16 @@ class Coin680Whale_Digest {
             "🚨 On-chain signal worth a look.",
             "👀 Notable wallet activity just hit our radar.",
         );
+        // Deliberately says "Coin680 website" (not "coin680.com" or any
+        // other TLD-looking string) -- explicit enough that readers know
+        // it's a real website to go visit, but nothing X's link-detector
+        // would linkify/bill as ContentCreateWithUrl (per direct request
+        // 2026-07-31: keep it plain English, but make sure "live" +
+        // "website" + "Coin680" all show up in the closing line).
         $ctas = array(
-            "Live whale signals updating in real time on Coin680.",
-            "Full on-chain feed, more moves like this, live on Coin680.",
-            "Track every whale signal as it happens, live on Coin680.",
+            "Live now on the Coin680 website.",
+            "More whale signals live on the Coin680 website.",
+            "Full on-chain feed live on the Coin680 website.",
         );
         $hook = $hooks[array_rand($hooks)];
         $cta = $ctas[array_rand($ctas)];
