@@ -66,12 +66,12 @@ main { display: block; max-width: 1200px; margin: 0 auto; padding: 0 20px; }
 .custom-logo { height: 56px; width: auto; max-width: none; }
 .c680-primary-nav { flex: 1; display: flex; justify-content: center; min-width: 0; }
 .c680-menu {
-  list-style: none; display: flex; flex-wrap: nowrap; gap: 16px; margin: 0; padding: 0;
+  list-style: none; display: flex; flex-wrap: nowrap; gap: 14px; margin: 0; padding: 0;
   position: relative;
 }
 .c680-menu li { position: relative; }
 .c680-menu > li > a {
-  color: var(--c680-navy); font-weight: 500; font-size: 14px; text-decoration: none; padding: 8px 0;
+  color: var(--c680-navy); font-weight: 500; font-size: 16px; text-decoration: none; padding: 8px 0;
   white-space: nowrap;
 }
 .c680-menu > li > a:hover { color: var(--c680-red); }
