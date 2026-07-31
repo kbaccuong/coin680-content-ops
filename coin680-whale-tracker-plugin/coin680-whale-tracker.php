@@ -115,6 +115,15 @@ function coin680whale_init() {
     // history / GitHub for the prior version) -- no rebuild needed.
     wp_clear_scheduled_hook('coin680whale_digest_check');
 
+    // New replacement path (2026-07-31): a single-transaction "teaser" post
+    // with no url/domain text, capped at 3/day via Coin680Whale_Digest::
+    // TEASER_INTERVAL_MINUTES (480 = 8h) -- see that class for the full
+    // reasoning. Checked every 5 min like the other crons, but the 8h floor
+    // inside maybe_post_onchain_teaser() means it only actually posts 3x/day.
+    if (!wp_next_scheduled('coin680whale_teaser_check')) {
+        wp_schedule_event(time(), 'coin680x_five_minutes', 'coin680whale_teaser_check');
+    }
+
     if (!wp_next_scheduled('coin680whale_daily_recap')) {
         wp_schedule_event(time(), 'daily', 'coin680whale_daily_recap');
     }
@@ -219,6 +228,9 @@ function coin680whale_activate() {
     // above for why). Scheduling it here would be immediately undone by
     // that unconditional wp_clear_scheduled_hook() on the very next load
     // anyway, so leaving it out is just less misleading to read.
+    if (!wp_next_scheduled('coin680whale_teaser_check')) {
+        wp_schedule_event(time(), 'coin680x_five_minutes', 'coin680whale_teaser_check');
+    }
     if (!wp_next_scheduled('coin680whale_daily_recap')) {
         wp_schedule_event(time(), 'daily', 'coin680whale_daily_recap');
     }
@@ -242,6 +254,7 @@ function coin680whale_deactivate() {
     wp_clear_scheduled_hook('coin680whale_daily_recap');
     wp_clear_scheduled_hook('coin680watchlist_poll');
     wp_clear_scheduled_hook('coin680whale_daily_cleanup');
+    wp_clear_scheduled_hook('coin680whale_teaser_check');
 }
 register_deactivation_hook(__FILE__, 'coin680whale_deactivate');
 
