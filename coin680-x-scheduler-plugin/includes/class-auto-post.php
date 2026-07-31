@@ -12,11 +12,21 @@
  * `auto_tweet_category_id` in Settings (or set it to 0) to adjust/disable.
  *
  * Tweet text is built purely from what the post itself already has (title,
- * excerpt, permalink) -- no AI call, no external composition step, so it
- * works the same whether the post was written by Claude or anyone else.
- * Uses the post's Excerpt field if set (falls back to a trimmed plain-text
- * version of the content) to leave room for the link and hashtags within
- * X's 280-character limit.
+ * excerpt) -- no AI call, no external composition step, so it works the
+ * same whether the post was written by Claude or anyone else. Uses the
+ * post's Excerpt field if set (falls back to a trimmed plain-text version
+ * of the content) to leave room for hashtags within X's 280-character
+ * limit.
+ *
+ * Deliberately DOES NOT include the article link in the tweet text
+ * (changed 2026-07-31, per direct cost request). X's pay-per-use API
+ * pricing charges $0.20 per post that contains a URL vs. $0.015 for a
+ * plain post -- confirmed directly from the account's own X Developer
+ * Console usage breakdown ("ContentCreateWithUrl" events dominating the
+ * bill). Summary + Featured Image only is treated as good enough for a
+ * teaser post; readers who want the full article can find it via the
+ * profile/site rather than a direct link in every single post. If a link
+ * is ever wanted back, re-add it in $text below.
  */
 
 if (!defined('ABSPATH')) {
@@ -77,7 +87,6 @@ class Coin680X_AutoPost {
         }
 
         $title = html_entity_decode(get_the_title($post), ENT_QUOTES);
-        $link = get_permalink($post);
 
         $summary = get_the_excerpt($post);
         if (!$summary) {
@@ -87,14 +96,14 @@ class Coin680X_AutoPost {
 
         $hashtags = '#Crypto #News';
 
-        // Fit within 280 chars: title + link + hashtags are fixed cost,
-        // the summary is trimmed to whatever room is left. Link always
-        // counts as ~23 chars on X regardless of actual length (t.co
-        // shortening), so budget it at a flat 24 to be safe.
-        $fixed_cost = $this->str_len($title) + 24 + $this->str_len($hashtags) + 6; // +6 for spacing/newlines
+        // Fit within 280 chars: title + hashtags are fixed cost, the
+        // summary is trimmed to whatever room is left. No link is
+        // included (see docblock) -- posts with a URL are billed at
+        // $0.20 vs. $0.015 for a plain post on X's pay-per-use API.
+        $fixed_cost = $this->str_len($title) + $this->str_len($hashtags) + 6; // +6 for spacing/newlines
         $summary_budget = max(0, 280 - $fixed_cost);
         if ($summary_budget < 20) {
-            $summary = ''; // no room left -- title + link + hashtags alone
+            $summary = ''; // no room left -- title + hashtags alone
         } elseif ($this->str_len($summary) > $summary_budget) {
             $summary = $this->str_trim($summary, $summary_budget - 1) . '...';
         }
@@ -103,7 +112,7 @@ class Coin680X_AutoPost {
         if ($summary) {
             $text .= "\n\n{$summary}";
         }
-        $text .= "\n\n{$link}\n\n{$hashtags}";
+        $text .= "\n\n{$hashtags}";
 
         // Use the post's own featured image if one is set -- falls back to
         // no image (empty string) rather than guessing/fetching anything
@@ -117,3 +126,4 @@ class Coin680X_AutoPost {
         Coin680X_Queue::add($text, $media_url, '', current_time('mysql', true));
     }
 }
+
