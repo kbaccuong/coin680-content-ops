@@ -108,9 +108,12 @@ main { display: block; max-width: 1200px; margin: 0 auto; padding: 0 20px; }
    without depending on the footer menu being configured. */
 .c680-header-x {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 36px; height: 36px; border-radius: 50%; background: var(--c680-navy);
-  color: #fff; flex-shrink: 0; margin-left: 12px; transition: background .2s;
+  width: 48px; height: 48px; border-radius: 50%; background: var(--c680-navy);
+  color: #fff; flex-shrink: 0; margin-left: 12px; transition: background .2s, transform .2s;
+  box-shadow: 0 2px 8px rgba(17,28,45,0.25);
 }
+.c680-header-x:hover { transform: scale(1.06); }
+.c680-header-x svg { width: 24px; height: 24px; }
 .c680-header-x:hover { background: var(--c680-red); text-decoration: none; }
 .c680-footer-x { color: #cfd5de; }
 .c680-footer-x:hover { color: #fff; }
