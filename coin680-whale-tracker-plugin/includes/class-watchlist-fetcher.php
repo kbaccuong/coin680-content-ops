@@ -40,11 +40,25 @@ class Coin680Watchlist_Fetcher {
 
     private function __construct() {
         add_action('coin680watchlist_poll', array($this, 'poll'));
+        add_action('coin680whale_daily_cleanup', array($this, 'cleanup_old'));
     }
 
     public static function table_name() {
         global $wpdb;
         return $wpdb->prefix . 'coin680_watchlist_txns';
+    }
+
+    /**
+     * Same retention/housekeeping reasoning as Coin680Bitquery_Fetcher::
+     * cleanup_old() -- see that method's docblock. Shares the same daily
+     * cron hook (both classes' constructors hook it independently; WP
+     * allows multiple callbacks on one action).
+     */
+    public function cleanup_old($days = 14) {
+        global $wpdb;
+        $table = self::table_name();
+        $cutoff = gmdate('Y-m-d H:i:s', time() - $days * DAY_IN_SECONDS);
+        $wpdb->query($wpdb->prepare("DELETE FROM $table WHERE tx_timestamp < %s", $cutoff));
     }
 
     public static function create_table() {
