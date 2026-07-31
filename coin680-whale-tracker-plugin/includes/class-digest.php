@@ -48,6 +48,72 @@ class Coin680Whale_Digest {
     private function __construct() {
         add_action('coin680whale_digest_check', array($this, 'maybe_post_digest'));
         add_action('coin680whale_daily_recap', array($this, 'post_daily_recap'));
+        add_action('coin680whale_teaser_check', array($this, 'maybe_post_onchain_teaser'));
+    }
+
+    // 24h / 3 posts = 8h apart. Replaces the old multi-coin digest
+    // (coin680whale_digest_check, permanently disabled 2026-07-31) as the
+    // only remaining on-chain X posting path -- per direct feedback, the
+    // old format's per-line explorer links were the confirmed driver of
+    // real X API billing (checked developer.x.com/billing: 127/209
+    // requests in 30 days were "ContentCreateWithUrl", spiking exactly
+    // when the digest went live). This format is deliberately a SINGLE
+    // notable transaction as a short hook, with NO url/domain text
+    // anywhere in the body -- just the brand name "Coin680" (no ".com",
+    // nothing X's link-detector would linkify) -- to test the hypothesis
+    // that a link-free post falls into the cheap/free "Content Create"
+    // category instead. The public /whale-signals/ page already carries
+    // the full data feed, so this tweet's job is purely "hook -> brand
+    // recall", not "deliver the data" -- consistent with why a raw link
+    // isn't actually needed here even leaving cost aside.
+    const TEASER_INTERVAL_MINUTES = 480;
+
+    public function maybe_post_onchain_teaser() {
+        $last_post_at = get_option('coin680whale_last_teaser_post_at');
+        if ($last_post_at && (time() - (int) $last_post_at) < self::TEASER_INTERVAL_MINUTES * MINUTE_IN_SECONDS) {
+            return;
+        }
+
+        // 12h lookback: wide enough to almost always find something even
+        // through a quiet stretch, without reaching back so far that the
+        // "biggest thing found" is no longer timely.
+        $since = gmdate('Y-m-d H:i:s', time() - 12 * HOUR_IN_SECONDS);
+        $pool = $this->fetch_pool($since, 20);
+        if (empty($pool)) {
+            return;
+        }
+        usort($pool, function ($a, $b) {
+            return $b->amount_usd <=> $a->amount_usd;
+        });
+        $item = $pool[0];
+
+        $text = $this->build_teaser_text($item);
+        if (class_exists('Coin680X_Queue')) {
+            Coin680X_Queue::add($text, '', '', current_time('mysql', true));
+        }
+        $this->mark_pool_used(array($item));
+        update_option('coin680whale_last_teaser_post_at', time(), false);
+    }
+
+    private function build_teaser_text($item) {
+        $amount_fmt = '$' . number_format($item->amount_usd);
+        $blurb = self::classification_blurb($item->raw);
+        $symbol_display = self::cashtag($item->symbol);
+
+        $hooks = array(
+            "🐋 Whale move just landed.",
+            "🚨 On-chain signal worth a look.",
+            "👀 Notable wallet activity just hit our radar.",
+        );
+        $ctas = array(
+            "Live whale signals updating in real time on Coin680.",
+            "Full on-chain feed, more moves like this, live on Coin680.",
+            "Track every whale signal as it happens, live on Coin680.",
+        );
+        $hook = $hooks[array_rand($hooks)];
+        $cta = $ctas[array_rand($ctas)];
+
+        return "{$hook}\n\n{$amount_fmt} {$symbol_display} ({$item->chain_label}) {$blurb}.\n\n{$cta}\n\n#Crypto #OnChain #Whale";
     }
 
     private static function explorer_url($blockchain, $hash) {
