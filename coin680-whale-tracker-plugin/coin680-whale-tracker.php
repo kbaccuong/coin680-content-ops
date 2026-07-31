@@ -118,6 +118,18 @@ function coin680whale_init() {
         wp_schedule_event(time(), 'daily', 'coin680whale_daily_recap');
     }
 
+    // Added 2026-07-31 -- daily retention cleanup for the two Bitquery-fed
+    // tables (wp_coin680_bitquery_txns, wp_coin680_watchlist_txns), which
+    // previously grew forever with no trim. Coin680Bitquery_Fetcher and
+    // Coin680Watchlist_Fetcher each hook their own cleanup_old() onto this
+    // SAME event name in their own constructors -- WP allows multiple
+    // callbacks per action, so one daily schedule here is enough to drive
+    // both. Disk/backup housekeeping only; does not affect query speed
+    // (tx_timestamp is indexed, see cleanup_old()'s docblock).
+    if (!wp_next_scheduled('coin680whale_daily_cleanup')) {
+        wp_schedule_event(time(), 'daily', 'coin680whale_daily_cleanup');
+    }
+
     // Same self-healing pattern applied to the two market-data polling
     // hooks (added 2026-07-30, proactively -- these had the identical
     // "only ever scheduled once" gap that caused the digest cron bug fixed
@@ -213,6 +225,9 @@ function coin680whale_activate() {
     if (!wp_next_scheduled('coin680watchlist_poll')) {
         wp_schedule_event(time(), 'coin680x_five_minutes', 'coin680watchlist_poll');
     }
+    if (!wp_next_scheduled('coin680whale_daily_cleanup')) {
+        wp_schedule_event(time(), 'daily', 'coin680whale_daily_cleanup');
+    }
 }
 register_activation_hook(__FILE__, 'coin680whale_activate');
 
@@ -223,6 +238,7 @@ function coin680whale_deactivate() {
     wp_clear_scheduled_hook('coin680whale_digest_check');
     wp_clear_scheduled_hook('coin680whale_daily_recap');
     wp_clear_scheduled_hook('coin680watchlist_poll');
+    wp_clear_scheduled_hook('coin680whale_daily_cleanup');
 }
 register_deactivation_hook(__FILE__, 'coin680whale_deactivate');
 
