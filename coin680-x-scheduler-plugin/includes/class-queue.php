@@ -157,6 +157,33 @@ class Coin680X_Queue {
         return $body_json['media_id_string'];
     }
 
+    /**
+     * Deletes an already-published live tweet via X's own API, signed with
+     * the same stored OAuth 1.0a credentials used to post -- lets an admin
+     * (or the REST endpoint in class-rest.php) clean up/replace a bad post
+     * without needing direct DB/SSH access to look up credentials manually.
+     */
+    public function delete_tweet($tweet_id) {
+        $url = 'https://api.twitter.com/2/tweets/' . rawurlencode($tweet_id);
+        $oauth = $this->get_oauth();
+        $auth_header = $oauth->auth_header('DELETE', $url);
+
+        $response = wp_remote_request($url, array(
+            'method'  => 'DELETE',
+            'timeout' => 20,
+            'headers' => array('Authorization' => $auth_header),
+        ));
+
+        if (is_wp_error($response)) {
+            return $response;
+        }
+        $body_json = json_decode(wp_remote_retrieve_body($response), true);
+        if (empty($body_json['data']['deleted'])) {
+            return new WP_Error('delete_failed', wp_remote_retrieve_body($response));
+        }
+        return true;
+    }
+
     private function post_tweet($text, $media_id = null, $reply_to_id = null, $poll_options = null, $poll_duration = 0) {
         $url = 'https://api.twitter.com/2/tweets';
         $oauth = $this->get_oauth();
