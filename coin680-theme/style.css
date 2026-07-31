@@ -64,11 +64,15 @@ main { display: block; max-width: 1200px; margin: 0 auto; padding: 0 20px; }
 .c680-logo-text { font-size: 26px; font-weight: 900; color: var(--c680-red); letter-spacing: -0.5px; }
 .custom-logo-link { display: block; line-height: 0; }
 .custom-logo { height: 56px; width: auto; max-width: none; }
-.c680-primary-nav { flex: 1; display: flex; justify-content: center; }
-.c680-menu { list-style: none; display: flex; gap: 26px; margin: 0; padding: 0; position: relative; }
+.c680-primary-nav { flex: 1; display: flex; justify-content: center; min-width: 0; }
+.c680-menu {
+  list-style: none; display: flex; flex-wrap: nowrap; gap: 16px; margin: 0; padding: 0;
+  position: relative;
+}
 .c680-menu li { position: relative; }
 .c680-menu > li > a {
-  color: var(--c680-navy); font-weight: 500; font-size: 15px; text-decoration: none; padding: 8px 0;
+  color: var(--c680-navy); font-weight: 500; font-size: 14px; text-decoration: none; padding: 8px 0;
+  white-space: nowrap;
 }
 .c680-menu > li > a:hover { color: var(--c680-red); }
 .c680-menu ul {
