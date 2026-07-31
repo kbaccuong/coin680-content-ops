@@ -20,7 +20,7 @@ get_header();
             <?php
             while (have_posts()) :
                 the_post();
-                get_template_part('template-parts/card', null, array('variant' => 'standard'));
+                get_template_part('template-parts/card', null, array('variant' => 'standard', 'cat_name' => single_cat_title('', false)));
             endwhile;
             ?>
         <?php else : ?>
