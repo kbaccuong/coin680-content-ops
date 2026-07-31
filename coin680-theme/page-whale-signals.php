@@ -155,7 +155,7 @@ $coin680_ws_type_labels = array('' => __('All Types', 'coin680'), 'buy' => __('B
 
         <p class="c680-prices-updated" id="c680-ws-updated">
             <?php if ($coin680_ws_page === 1) : ?>
-                <?php esc_html_e('Auto-refreshing every ~20s.', 'coin680'); ?>
+                <?php esc_html_e('Auto-refreshing every ~60s.', 'coin680'); ?>
             <?php else : ?>
                 <?php esc_html_e('Browsing history -- go to page 1 for the live feed.', 'coin680'); ?>
             <?php endif; ?>
@@ -211,13 +211,13 @@ $coin680_ws_type_labels = array('' => __('All Types', 'coin680'), 'buy' => __('B
                     tbody.innerHTML = data.items.map(renderRow).join('');
                 }
                 if (statusEl) {
-                    statusEl.textContent = <?php echo wp_json_encode(__('Auto-refreshing every ~20s. Last updated: ', 'coin680')); ?> + new Date().toLocaleTimeString();
+                    statusEl.textContent = <?php echo wp_json_encode(__('Auto-refreshing every ~60s. Last updated: ', 'coin680')); ?> + new Date().toLocaleTimeString();
                 }
             })
             .catch(function () { /* silent -- keep last good render on a transient failure */ });
     }
 
-    setInterval(refresh, 20000);
+    setInterval(refresh, 60000);
 })();
 </script>
 <?php endif; ?>
