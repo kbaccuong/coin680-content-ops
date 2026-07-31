@@ -37,11 +37,30 @@ class Coin680Bitquery_Fetcher {
 
     private function __construct() {
         add_action('coin680bitquery_poll', array($this, 'poll'));
+        add_action('coin680whale_daily_cleanup', array($this, 'cleanup_old'));
     }
 
     public static function table_name() {
         global $wpdb;
         return $wpdb->prefix . 'coin680_bitquery_txns';
+    }
+
+    /**
+     * Added 2026-07-31 -- the table only ever grew (no retention limit), and
+     * the public /whale-signals/ page never queries past COIN680_WS_HOURS
+     * (7 days) anyway, so anything older than that is pure dead weight for
+     * disk/backup size. Keeps a few days of margin past the 7-day UI window
+     * rather than trimming right at 7, purely so there's still some slack
+     * for manual debugging/admin review of "last week" data. Does NOT
+     * improve query speed (tx_timestamp is indexed, so a filtered range
+     * query already ignores older rows regardless of table size) -- this is
+     * housekeeping only.
+     */
+    public function cleanup_old($days = 14) {
+        global $wpdb;
+        $table = self::table_name();
+        $cutoff = gmdate('Y-m-d H:i:s', time() - $days * DAY_IN_SECONDS);
+        $wpdb->query($wpdb->prepare("DELETE FROM $table WHERE tx_timestamp < %s", $cutoff));
     }
 
     public static function create_table() {
