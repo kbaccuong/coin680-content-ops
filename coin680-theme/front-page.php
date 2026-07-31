@@ -25,11 +25,11 @@ get_header();
     <section class="c680-hero-section">
         <div class="c680-hero-main">
             <?php $coin680_hero->the_post(); ?>
-            <?php get_template_part('template-parts/card', null, array('variant' => 'hero')); ?>
+            <?php get_template_part('template-parts/card', null, array('variant' => 'hero', 'cat_name' => __('Crypto Market News', 'coin680'))); ?>
         </div>
         <div class="c680-hero-secondary">
             <?php while ($coin680_hero->have_posts()) : $coin680_hero->the_post(); ?>
-                <?php get_template_part('template-parts/card', null, array('variant' => 'compact')); ?>
+                <?php get_template_part('template-parts/card', null, array('variant' => 'compact', 'cat_name' => __('Crypto Market News', 'coin680'))); ?>
             <?php endwhile; ?>
         </div>
     </section>
