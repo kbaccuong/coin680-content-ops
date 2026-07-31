@@ -49,6 +49,67 @@ class Coin680Whale_Digest {
         add_action('coin680whale_digest_check', array($this, 'maybe_post_digest'));
         add_action('coin680whale_daily_recap', array($this, 'post_daily_recap'));
         add_action('coin680whale_teaser_check', array($this, 'maybe_post_onchain_teaser'));
+        add_action('coin680whale_roundup_daily', array($this, 'post_daily_roundup'));
+    }
+
+    /**
+     * Once-daily on-chain roundup (added 2026-07-31), the paid-link
+     * counterpart to the free-form teaser posts above -- fires once/day via
+     * WP's native 'daily' schedule (see plugin bootstrap), so no MIN/MAX_
+     * WAIT_MINUTES accumulation logic is needed here, unlike the old 30-50
+     * min digest this replaces. Reuses select_diverse_items()/fetch_pool()
+     * (tested code, same coin-diversity picking as the old digest) but
+     * ONLY ONE link total -- to /whale-signals/, appended once at the very
+     * end -- instead of a separate explorer link on every line. That old
+     * per-line-link format was the confirmed driver of the ~$26 X API bill
+     * (developer.x.com/billing showed 127/209 requests as
+     * "ContentCreateWithUrl", spiking exactly when the old digest was
+     * live). Also drops the old "Net Exchange Flow" sentence -- that was
+     * computed from Whale Alert (Bitcoin)-only data, and Whale Alert
+     * stopped collecting new data on 2026-07-30, so reusing it here would
+     * describe stale, frozen numbers rather than anything about the
+     * current 24h window.
+     */
+    public function post_daily_roundup() {
+        $since = gmdate('Y-m-d H:i:s', time() - DAY_IN_SECONDS);
+        $items = $this->select_diverse_items($since, self::MAX_COINS_PER_POST);
+        if (empty($items)) {
+            return;
+        }
+        $text = $this->build_roundup_text($items);
+        if (class_exists('Coin680X_Queue')) {
+            Coin680X_Queue::add($text, '', '', current_time('mysql', true));
+        }
+        $this->mark_pool_used($items);
+    }
+
+    private function build_roundup_text($items) {
+        $header = "🐋 #COIN680 DAILY ON-CHAIN RECAP:\n\n";
+        $lines = array();
+        $cashtag_used = false;
+        foreach ($items as $item) {
+            $amount_fmt = '$' . number_format($item->amount_usd);
+            $blurb = self::classification_blurb($item->raw);
+            // Same one-cashtag-per-post rule as the old digest (X rejects
+            // the whole post if more than one $SYMBOL cashtag appears) --
+            // only the first/largest item gets the real cashtag treatment.
+            $symbol_display = $cashtag_used ? strtoupper($item->symbol) : self::cashtag($item->symbol);
+            $cashtag_used = true;
+            $lines[] = "• {$amount_fmt} {$symbol_display} ({$item->chain_label}) {$blurb}.";
+        }
+        $body = implode("\n\n", $lines);
+
+        $takeaways = array(
+            "None of this guarantees where price goes next, but it does tell you where supply is moving -- and that's usually the part of the story raw price charts miss.",
+            "For traders, this is a data point to weigh alongside price action, not a signal to act on alone -- these flows shift available supply, they don't guarantee direction.",
+            "Flows like this shift how much supply is sitting in easy reach of a sale, which matters most when combined with what price is already doing.",
+        );
+        $takeaway = $takeaways[array_rand($takeaways)];
+
+        $cta = "\n\nFull breakdown + live feed: " . home_url('/whale-signals/');
+        $hashtags = "\n\n#Crypto #OnChain #Whale #Multichain";
+
+        return $header . $body . "\n\n" . $takeaway . $cta . $hashtags;
     }
 
     // 24h / 3 posts = 8h apart. Replaces the old multi-coin digest
