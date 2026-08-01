@@ -78,7 +78,14 @@ class Coin680Whale_Digest {
         }
         $text = $this->build_roundup_text($items);
         if (class_exists('Coin680X_Queue')) {
-            Coin680X_Queue::add($text, '', '', current_time('mysql', true));
+            // Fixed branded banner, not a per-day generated image -- this
+            // post always includes a link (home_url('/whale-signals/')),
+            // and without an attached image X falls back to that link's
+            // OG-image link-card preview instead of anything on-brand.
+            // Added 2026-08-01 after the fallback card showed up looking
+            // generic/cropped in a live tweet.
+            $banner_url = 'https://coin680.com/wp-content/uploads/2026/08/daily-onchain-recap-banner.png';
+            Coin680X_Queue::add($text, $banner_url, '', current_time('mysql', true));
         }
         $this->mark_pool_used($items);
     }
