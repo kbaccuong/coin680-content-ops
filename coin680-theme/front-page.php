@@ -132,6 +132,37 @@ get_header();
     coin680_category_section(__('Learn Bitcoin', 'coin680'), 'bitcoin-academy', 4);
     ?>
 
+    <section class="c680-forum-cta-section">
+        <a href="<?php echo esc_url(home_url('/forums/')); ?>" class="c680-forum-cta-card">
+            <div class="c680-forum-cta-text">
+                <span class="c680-forum-cta-title"><?php esc_html_e('Join the Discussion', 'coin680'); ?></span>
+                <span class="c680-forum-cta-desc"><?php esc_html_e('Talk Bitcoin and crypto with the Coin680 community -- market moves, questions, on-chain trends, and more.', 'coin680'); ?></span>
+            </div>
+            <span class="c680-forum-cta-btn"><?php esc_html_e('Visit Forums', 'coin680'); ?> &rarr;</span>
+        </a>
+    </section>
+    <style>
+    .c680-forum-cta-section { margin: 32px 0; }
+    .c680-forum-cta-card {
+        display: flex; align-items: center; justify-content: space-between; gap: 20px;
+        background: linear-gradient(135deg, #111c2d, #1b2942);
+        border: 1px solid #c11510; border-radius: 10px;
+        padding: 22px 28px; text-decoration: none; color: #fffbf2;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .c680-forum-cta-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(193,21,16,0.25); }
+    .c680-forum-cta-text { display: flex; flex-direction: column; gap: 4px; }
+    .c680-forum-cta-title { font-size: 20px; font-weight: 700; color: #fffbf2; }
+    .c680-forum-cta-desc { font-size: 14px; color: #c7cede; max-width: 560px; }
+    .c680-forum-cta-btn {
+        flex-shrink: 0; background: #c11510; color: #fff; font-weight: 600; font-size: 14px;
+        padding: 10px 18px; border-radius: 6px; white-space: nowrap;
+    }
+    @media (max-width: 640px) {
+        .c680-forum-cta-card { flex-direction: column; align-items: flex-start; }
+    }
+    </style>
+
     <section class="c680-newsletter-section">
         <?php coin680_newsletter_form('homepage'); ?>
     </section>
@@ -173,4 +204,5 @@ get_header();
 
 </main>
 <?php get_footer(); ?>
+
 
