@@ -53,8 +53,32 @@ wp_reset_postdata();
         <a href="https://x.com/coin680" target="_blank" rel="noopener" class="c680-header-x" aria-label="<?php esc_attr_e('Follow Coin680 on X', 'coin680'); ?>" title="<?php esc_attr_e('Follow us on X', 'coin680'); ?>">
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
         </a>
+        <div class="c680-header-auth">
+            <?php if (is_user_logged_in()) :
+                $coin680_current_user = wp_get_current_user();
+                $coin680_current_url  = esc_url(home_url($_SERVER['REQUEST_URI']));
+            ?>
+                <span class="c680-auth-greeting"><?php echo esc_html($coin680_current_user->display_name); ?></span>
+                <a href="<?php echo esc_url(wp_logout_url($coin680_current_url)); ?>" class="c680-auth-link"><?php esc_html_e('Log Out', 'coin680'); ?></a>
+            <?php else :
+                $coin680_current_url = esc_url(home_url($_SERVER['REQUEST_URI']));
+            ?>
+                <a href="<?php echo esc_url(wp_login_url($coin680_current_url)); ?>" class="c680-auth-link"><?php esc_html_e('Log In', 'coin680'); ?></a>
+                <a href="<?php echo esc_url(wp_registration_url()); ?>" class="c680-auth-link c680-auth-register"><?php esc_html_e('Register', 'coin680'); ?></a>
+            <?php endif; ?>
+        </div>
     </div>
 </header>
+<style>
+.c680-header-auth { display: flex; align-items: center; gap: 10px; margin-left: 10px; font-size: 13px; white-space: nowrap; }
+.c680-auth-greeting { color: inherit; opacity: 0.8; }
+.c680-auth-link { text-decoration: none; color: inherit; padding: 5px 10px; border-radius: 4px; border: 1px solid currentColor; opacity: 0.85; }
+.c680-auth-link:hover { opacity: 1; }
+.c680-auth-register { background: #c11510; border-color: #c11510; color: #fff; opacity: 1; }
+@media (max-width: 782px) {
+    .c680-header-auth { margin-left: 0; order: 3; }
+}
+</style>
 <script>
 (function () {
     var toggle = document.querySelector('.c680-nav-toggle');
@@ -67,3 +91,4 @@ wp_reset_postdata();
     });
 })();
 </script>
+
