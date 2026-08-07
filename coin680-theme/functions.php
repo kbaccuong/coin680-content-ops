@@ -1078,4 +1078,58 @@ function coin680_maybe_affiliate_banner($content) {
 }
 add_filter('the_content', 'coin680_maybe_affiliate_banner');
 
+/* ==========================================================================
+   Admin-only REST endpoint to seed bbPress forum topics programmatically
+   (bbPress has no REST API of its own -- confirmed 2026-08-06, no
+   forum/topic/reply routes exist under wp-json). Wraps bbPress's own
+   bbp_insert_topic() so topic/reply counts and forum relationships stay
+   consistent, rather than inserting raw posts by hand.
+   ========================================================================== */
+
+function coin680_register_forum_topic_route() {
+    register_rest_route('coin680/v1', '/forum-topic', array(
+        'methods'             => 'POST',
+        'callback'            => 'coin680_handle_create_forum_topic',
+        'permission_callback' => function () {
+            return current_user_can('manage_options');
+        },
+    ));
+}
+add_action('rest_api_init', 'coin680_register_forum_topic_route');
+
+function coin680_handle_create_forum_topic($request) {
+    if (!function_exists('bbp_insert_topic')) {
+        return new WP_Error('bbpress_missing', 'bbPress is not active.', array('status' => 500));
+    }
+
+    $params = $request->get_json_params();
+    $title = isset($params['title']) ? sanitize_text_field($params['title']) : '';
+    $content = isset($params['content']) ? wp_kses_post($params['content']) : '';
+    $forum_id = isset($params['forum_id']) ? (int) $params['forum_id'] : 0;
+
+    if (!$title || !$content || !$forum_id || get_post_type($forum_id) !== 'forum') {
+        return new WP_Error('missing_fields', 'title, content, and a valid forum_id are required.', array('status' => 400));
+    }
+
+    $topic_id = bbp_insert_topic(
+        array(
+            'post_parent'  => $forum_id,
+            'post_title'   => $title,
+            'post_content' => $content,
+            'post_author'  => get_current_user_id(),
+        ),
+        array('forum_id' => $forum_id)
+    );
+
+    if (!$topic_id || is_wp_error($topic_id)) {
+        return new WP_Error('create_failed', 'Failed to create the topic.', array('status' => 500));
+    }
+
+    return new WP_REST_Response(array(
+        'topic_id' => $topic_id,
+        'url'      => get_permalink($topic_id),
+    ), 200);
+}
+
+
 
