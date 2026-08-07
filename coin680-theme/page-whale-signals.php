@@ -69,10 +69,11 @@ $coin680_ws_type_labels = array('' => __('All Types', 'coin680'), 'buy' => __('B
     </section>
     <?php endif; ?>
 
-    <?php if (!empty($coin680_ws_smart_money)) : ?>
+    <?php if (!empty($coin680_ws_watched_wallets)) : ?>
     <section class="c680-ws-section">
         <h2 class="c680-section-title"><?php esc_html_e('Smart Money Moves', 'coin680'); ?></h2>
         <p class="c680-prices-intro"><?php esc_html_e('Flagged for WHO made the move, not size alone -- context for your own research, not a signal to copy blindly.', 'coin680'); ?></p>
+        <?php if (!empty($coin680_ws_smart_money)) : ?>
         <div class="c680-prices-table-wrap">
             <table class="c680-prices-table">
                 <thead><tr>
@@ -98,6 +99,9 @@ $coin680_ws_type_labels = array('' => __('All Types', 'coin680'), 'buy' => __('B
                 </tbody>
             </table>
         </div>
+        <?php else : ?>
+        <p class="c680-ws-empty-note"><?php esc_html_e('No activity from watched wallets in the last 24 hours yet -- this updates automatically the moment one of them makes a move.', 'coin680'); ?></p>
+        <?php endif; ?>
     </section>
     <?php endif; ?>
 
@@ -223,3 +227,4 @@ $coin680_ws_type_labels = array('' => __('All Types', 'coin680'), 'buy' => __('B
 <?php endif; ?>
 
 <?php get_footer(); ?>
+
