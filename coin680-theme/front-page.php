@@ -142,7 +142,7 @@ get_header();
         </a>
     </section>
     <style>
-    .c680-forum-cta-section { margin: 32px 0; }
+    .c680-forum-cta-section { margin: 44px 0; }
     .c680-forum-cta-card {
         display: flex; align-items: center; justify-content: space-between; gap: 20px;
         background: linear-gradient(135deg, #111c2d, #1b2942);
