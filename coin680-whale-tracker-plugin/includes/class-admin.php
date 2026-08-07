@@ -23,6 +23,7 @@ class Coin680Whale_Admin {
 
     private function __construct() {
         add_action('admin_menu', array($this, 'add_menu'));
+        add_action('rest_api_init', array($this, 'register_rest_routes'));
         add_action('admin_post_coin680whale_save_settings', array($this, 'handle_save_settings'));
         add_action('admin_post_coin680whale_mark_used', array($this, 'handle_mark_used'));
         add_action('admin_post_coin680whale_poll_now', array($this, 'handle_poll_now'));
@@ -42,6 +43,34 @@ class Coin680Whale_Admin {
             'dashicons-chart-line',
             82
         );
+    }
+
+    /**
+     * Admin-only REST route to purge existing bad rows already inserted
+     * before the sanity checks in Coin680Bitquery_Fetcher::process_trade()
+     * (same-symbol legs, implausible USD values) were added -- lets these
+     * be cleaned up remotely without SSH/DB access. See
+     * Coin680Bitquery_Fetcher::MAX_SANE_TRADE_USD for the same ceiling.
+     */
+    public function register_rest_routes() {
+        register_rest_route('coin680whale/v1', '/purge-bad-trades', array(
+            'methods'             => 'POST',
+            'callback'            => array($this, 'rest_purge_bad_trades'),
+            'permission_callback' => function () {
+                return current_user_can('manage_options');
+            },
+        ));
+    }
+
+    public function rest_purge_bad_trades($request) {
+        global $wpdb;
+        $table = Coin680Bitquery_Fetcher::table_name();
+        $ceiling = 50000000; // keep in sync with Coin680Bitquery_Fetcher::MAX_SANE_TRADE_USD
+        $deleted = $wpdb->query($wpdb->prepare(
+            "DELETE FROM $table WHERE amount_usd > %f OR symbol = counter_symbol",
+            $ceiling
+        ));
+        return new WP_REST_Response(array('deleted' => (int) $deleted), 200);
     }
 
     public function handle_save_settings() {
@@ -413,4 +442,5 @@ class Coin680Whale_Admin {
         <?php
     }
 }
+
 
