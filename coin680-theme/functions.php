@@ -1097,6 +1097,32 @@ function coin680_register_forum_topic_route() {
 }
 add_action('rest_api_init', 'coin680_register_forum_topic_route');
 
+function coin680_register_forums_list_route() {
+    register_rest_route('coin680/v1', '/forums', array(
+        'methods'             => 'GET',
+        'callback'            => 'coin680_handle_list_forums',
+        'permission_callback' => function () {
+            return current_user_can('manage_options');
+        },
+    ));
+}
+add_action('rest_api_init', 'coin680_register_forums_list_route');
+
+function coin680_handle_list_forums($request) {
+    $forums = get_posts(array(
+        'post_type'      => 'forum',
+        'post_status'    => 'publish',
+        'posts_per_page' => -1,
+        'orderby'        => 'ID',
+        'order'          => 'ASC',
+    ));
+    $out = array();
+    foreach ($forums as $f) {
+        $out[] = array('id' => $f->ID, 'title' => $f->post_title, 'slug' => $f->post_name);
+    }
+    return new WP_REST_Response($out, 200);
+}
+
 function coin680_handle_create_forum_topic($request) {
     if (!function_exists('bbp_insert_topic')) {
         return new WP_Error('bbpress_missing', 'bbPress is not active.', array('status' => 500));
@@ -1130,6 +1156,7 @@ function coin680_handle_create_forum_topic($request) {
         'url'      => get_permalink($topic_id),
     ), 200);
 }
+
 
 
 
