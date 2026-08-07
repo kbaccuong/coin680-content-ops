@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('COIN680_VERSION', '1.4.3');
+define('COIN680_VERSION', '1.4.4');
 
 /* ==========================================================================
    Theme setup
