@@ -67,9 +67,17 @@ function coin680whale_init() {
     Coin680Bitquery_Fetcher::instance();
     Coin680Watchlist_Fetcher::instance();
     Coin680Whale_Digest::instance();
-    if (is_admin()) {
-        Coin680Whale_Admin::instance();
-    }
+    // Was gated behind is_admin() -- but is_admin() is FALSE during REST
+    // API requests (it only reflects the wp-admin/ URL context, not user
+    // capability), so Coin680Whale_Admin's rest_api_init hook (added
+    // 2026-08-06 for the purge-bad-trades endpoint) never registered on
+    // REST requests, making that endpoint 404 even though the code was
+    // correct. Instantiating unconditionally, like the other classes
+    // above, fixes this -- the class only ever adds action hooks
+    // (admin_menu, admin_post_*, rest_api_init) that stay inert unless
+    // their own trigger event fires, so there's no real cost to loading it
+    // on every request.
+    Coin680Whale_Admin::instance();
 
     // Schema upgrade path for sites where this plugin was already active
     // before the Bitquery migration -- runs the table create/upgrade again
@@ -270,5 +278,3 @@ function coin680whale_deactivate() {
     wp_clear_scheduled_hook('coin680whale_roundup_daily');
 }
 register_deactivation_hook(__FILE__, 'coin680whale_deactivate');
-
-
