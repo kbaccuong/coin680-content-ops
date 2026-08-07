@@ -28,6 +28,18 @@ class Coin680Bitquery_Fetcher {
     private static $instance = null;
     const ENDPOINT = 'https://streaming.bitquery.io/graphql';
 
+    // Sanity ceiling for a single DEX trade's USD value. Bitquery occasionally
+    // misattributes AmountInUSD on one leg of a multi-hop route (e.g. a
+    // Jupiter aggregator trade that internally routes SOL -> X -> SOL gets
+    // split into per-leg DEXTrades rows, and the implied price on one leg
+    // can come out nonsensically large/small) -- producing "trades" priced
+    // in the hundreds of billions of dollars, far beyond any real single
+    // DEX trade. Confirmed live on the site 2026-08-06 (WSOL-vs-WSOL Jupiter
+    // rows showing $693B-$4.2T). Since we can't fix Bitquery's own pricing,
+    // treat anything above this ceiling as bad data and discard it rather
+    // than ever display it as a real whale trade.
+    const MAX_SANE_TRADE_USD = 50000000; // $50M
+
     public static function instance() {
         if (self::$instance === null) {
             self::$instance = new self();
@@ -221,6 +233,13 @@ class Coin680Bitquery_Fetcher {
         if (!$buy_symbol || !$sell_symbol) {
             return;
         }
+        if ($buy_symbol === $sell_symbol) {
+            // Same token on both legs is never a genuine distinct trade --
+            // it's a reliable signal this row is a mis-split leg of a
+            // multi-hop route (see MAX_SANE_TRADE_USD comment above), so
+            // its AmountInUSD can't be trusted either. Skip entirely.
+            return;
+        }
         $buy_usd = (float) ($buy['AmountInUSD'] ?? 0);
         $sell_usd = (float) ($sell['AmountInUSD'] ?? 0);
 
@@ -265,6 +284,9 @@ class Coin680Bitquery_Fetcher {
 
         if ($amount_usd <= 0) {
             return; // neither side had a usable price -- never guess
+        }
+        if ($amount_usd > self::MAX_SANE_TRADE_USD) {
+            return; // implausible value -- almost certainly bad upstream pricing data
         }
 
         $threshold = $is_major ? $this->major_threshold() : $this->token_threshold();
@@ -379,4 +401,5 @@ class Coin680Bitquery_Fetcher {
         $wpdb->query($wpdb->prepare("UPDATE $table SET used_in_digest = 1 WHERE id IN ($placeholders)", $ids));
     }
 }
+
 
