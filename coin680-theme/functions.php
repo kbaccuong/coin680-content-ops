@@ -1097,6 +1097,46 @@ function coin680_register_forum_topic_route() {
 }
 add_action('rest_api_init', 'coin680_register_forum_topic_route');
 
+function coin680_register_create_forum_route() {
+    register_rest_route('coin680/v1', '/forum', array(
+        'methods'             => 'POST',
+        'callback'            => 'coin680_handle_create_forum',
+        'permission_callback' => function () {
+            return current_user_can('manage_options');
+        },
+    ));
+}
+add_action('rest_api_init', 'coin680_register_create_forum_route');
+
+function coin680_handle_create_forum($request) {
+    if (!function_exists('bbp_insert_forum')) {
+        return new WP_Error('bbpress_missing', 'bbPress is not active.', array('status' => 500));
+    }
+    $params = $request->get_json_params();
+    $title = isset($params['title']) ? sanitize_text_field($params['title']) : '';
+    $description = isset($params['description']) ? wp_kses_post($params['description']) : '';
+    $order = isset($params['menu_order']) ? (int) $params['menu_order'] : 0;
+
+    if (!$title) {
+        return new WP_Error('missing_fields', 'title is required.', array('status' => 400));
+    }
+
+    $forum_id = bbp_insert_forum(array(
+        'post_title'   => $title,
+        'post_content' => $description,
+        'menu_order'   => $order,
+    ));
+
+    if (!$forum_id || is_wp_error($forum_id)) {
+        return new WP_Error('create_failed', 'Failed to create the forum.', array('status' => 500));
+    }
+
+    return new WP_REST_Response(array(
+        'forum_id' => $forum_id,
+        'url'      => get_permalink($forum_id),
+    ), 200);
+}
+
 function coin680_register_forums_list_route() {
     register_rest_route('coin680/v1', '/forums', array(
         'methods'             => 'GET',
@@ -1156,6 +1196,7 @@ function coin680_handle_create_forum_topic($request) {
         'url'      => get_permalink($topic_id),
     ), 200);
 }
+
 
 
 
