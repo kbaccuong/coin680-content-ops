@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * Coin680 theme functions.
  */
