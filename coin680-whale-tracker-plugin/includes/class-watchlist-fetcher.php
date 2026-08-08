@@ -193,9 +193,9 @@ class Coin680Watchlist_Fetcher {
         }
     }
 
-    private function poll_chain($chain, $config, $wallets) {
+    private function poll_chain($chain, $config, $wallets, $since_override = null) {
         $last_opt = "coin680watchlist_last_time_{$chain}";
-        $since = get_option($last_opt) ?: gmdate('Y-m-d\TH:i:s\Z', time() - 15 * MINUTE_IN_SECONDS);
+        $since = $since_override ?: (get_option($last_opt) ?: gmdate('Y-m-d\TH:i:s\Z', time() - 15 * MINUTE_IN_SECONDS));
         $now = gmdate('Y-m-d\TH:i:s\Z', time());
 
         $addresses = wp_list_pluck($wallets, 'address');
@@ -233,7 +233,9 @@ class Coin680Watchlist_Fetcher {
             }
         }
 
-        update_option($last_opt, $now, false);
+        if (!$since_override) {
+            update_option($last_opt, $now, false);
+        }
     }
 
     private function process_trade($chain, $row, $wallet_by_address) {
@@ -331,13 +333,13 @@ class Coin680Watchlist_Fetcher {
      * that it wasn't worth guessing at without a Solana wallet actually on
      * the watchlist to test against).
      */
-    private function poll_transfers($chain, $config, $wallets) {
+    private function poll_transfers($chain, $config, $wallets, $since_override = null) {
         if (!$config || $config['query_kind'] !== 'evm') {
             return;
         }
 
         $last_opt = "coin680watchlist_last_transfer_time_{$chain}";
-        $since = get_option($last_opt) ?: gmdate('Y-m-d\TH:i:s\Z', time() - 15 * MINUTE_IN_SECONDS);
+        $since = $since_override ?: (get_option($last_opt) ?: gmdate('Y-m-d\TH:i:s\Z', time() - 15 * MINUTE_IN_SECONDS));
         $now = gmdate('Y-m-d\TH:i:s\Z', time());
 
         $addresses = wp_list_pluck($wallets, 'address');
@@ -359,7 +361,9 @@ class Coin680Watchlist_Fetcher {
             }
         }
 
-        update_option($last_opt, $now, false);
+        if (!$since_override) {
+            update_option($last_opt, $now, false);
+        }
     }
 
     private function process_transfer($chain, $row, $wallet_by_address) {
@@ -480,6 +484,52 @@ class Coin680Watchlist_Fetcher {
             return '';
         }
         return ucwords(str_replace('_', ' ', $slug));
+    }
+
+    /**
+     * One-time historical backfill -- queries Bitquery for both DEX swaps
+     * AND plain transfers going back $hours (instead of the normal
+     * incremental "since last poll" window), for every watched wallet.
+     * Added 2026-08-08 alongside poll_transfers() so a user who's had
+     * watched wallets configured for a while doesn't just start seeing
+     * fresh activity going forward with no historical record of what those
+     * wallets already did -- lets past legitimate activity (that the old
+     * DEX-swap-only logic silently never recorded) get pulled in once,
+     * on demand, via the /coin680whale/v1/watchlist-backfill REST route.
+     * Safe to call repeatedly: process_trade()/process_transfer() both
+     * INSERT IGNORE against a UNIQUE KEY, so re-running this just no-ops
+     * for anything already recorded. Bitquery's `limit: {count: 50}` cap
+     * per query means a wallet with more than 50 qualifying events inside
+     * the window will only get its 50 most recent ones -- fine for the
+     * modest activity levels this feature is designed around, but worth
+     * knowing if a very active wallet is ever added.
+     */
+    public function backfill($hours = 336) {
+        if (!$this->access_token() || !class_exists('Coin680Watchlist')) {
+            return 0;
+        }
+        $wallets = Coin680Watchlist::get_all(true);
+        if (empty($wallets)) {
+            return 0;
+        }
+        $since = gmdate('Y-m-d\TH:i:s\Z', time() - $hours * HOUR_IN_SECONDS);
+
+        $by_chain = array();
+        foreach ($wallets as $w) {
+            $config = Coin680Bitquery_Labels::chain_config($w->chain);
+            if (!$config || !in_array($config['query_kind'], self::SUPPORTED_KINDS, true)) {
+                continue;
+            }
+            $by_chain[$w->chain][] = $w;
+        }
+
+        foreach ($by_chain as $chain => $chain_wallets) {
+            $config = Coin680Bitquery_Labels::chain_config($chain);
+            $this->poll_chain($chain, $config, $chain_wallets, $since);
+            $this->poll_transfers($chain, $config, $chain_wallets, $since);
+        }
+
+        return self::count_recent($hours);
     }
 
     public static function get_recent($hours = 24, $limit = 100, $offset = 0) {
