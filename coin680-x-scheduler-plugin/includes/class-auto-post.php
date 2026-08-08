@@ -11,21 +11,22 @@
  * and auto-tweeting every single one would flood the X account. Change
  * `auto_tweet_category_id` in Settings (or set it to 0) to adjust/disable.
  *
- * Tweet text is built purely from what the post itself already has (title,
- * excerpt) -- no AI call, no external composition step, so it works the
- * same whether the post was written by Claude or anyone else. Uses the
- * post's Excerpt field if set (falls back to a trimmed plain-text version
- * of the content).
+ * Tweet text: if the post has a `_coin680x_custom_tweet` meta value set,
+ * that full text is used as-is (title + expanded summary + own analytical
+ * perspective, written per-article -- see the coin680-x-tweet-template
+ * approved 2026-08-08). Otherwise falls back to the original mechanical
+ * composition (title + excerpt/trimmed content + hashtags, no analysis
+ * step), kept for posts that don't have a custom tweet prepared.
  *
  * Does NOT squeeze the summary down to fit X's classic 280-character
  * limit -- the @coin680 account is on X Premium, which supports long-form
  * posts well beyond 280 chars via the same API call (no special payload
- * needed), so a curated, complete 300-600 char excerpt is used as-is
- * rather than being cut off mid-sentence with "..." (changed 2026-07-31
- * after that exact truncation showed up in a live tweet and was flagged:
- * "tôi yêu cầu là 1 bài tóm tắt hoàn chỉnh mà"). Only a generous sanity
- * cap ($MAX_SUMMARY_LEN) still applies, to stop a runaway/malformed
- * excerpt from producing an absurdly long post.
+ * needed), so a curated, complete summary is used as-is rather than being
+ * cut off mid-sentence with "..." (changed 2026-07-31 after that exact
+ * truncation showed up in a live tweet and was flagged: "tôi yêu cầu là 1
+ * bài tóm tắt hoàn chỉnh mà"). Only a generous sanity cap
+ * ($max_summary_len) still applies to the fallback path, to stop a
+ * runaway/malformed excerpt from producing an absurdly long post.
  *
  * Deliberately DOES NOT include the article link in the tweet text
  * (changed 2026-07-31, per direct cost request). X's pay-per-use API
@@ -59,6 +60,23 @@ class Coin680X_AutoPost {
         // at cron time) -- it does NOT refire on later edits to an already-
         // published post, so this can't double-tweet the same article.
         add_action('publish_post', array($this, 'maybe_queue_tweet'), 10, 2);
+
+        // Registers _coin680x_custom_tweet so it's settable via the REST
+        // API (POST /wp/v2/posts/{id} with {"meta":{"_coin680x_custom_tweet":"..."}}),
+        // letting a pre-written, per-article analytical tweet be attached
+        // to a post before it publishes.
+        add_action('init', array($this, 'register_custom_tweet_meta'));
+    }
+
+    public function register_custom_tweet_meta() {
+        register_post_meta('post', '_coin680x_custom_tweet', array(
+            'show_in_rest'  => true,
+            'single'        => true,
+            'type'          => 'string',
+            'auth_callback' => function () {
+                return current_user_can('edit_posts');
+            },
+        ));
     }
 
     /**
@@ -95,30 +113,36 @@ class Coin680X_AutoPost {
             return;
         }
 
-        $title = html_entity_decode(get_the_title($post), ENT_QUOTES);
+        $custom_text = get_post_meta($post_id, '_coin680x_custom_tweet', true);
 
-        $summary = get_the_excerpt($post);
-        if (!$summary) {
-            $summary = wp_trim_words(wp_strip_all_tags($post->post_content), 30, '...');
+        if (!empty($custom_text)) {
+            $text = html_entity_decode($custom_text, ENT_QUOTES);
+        } else {
+            $title = html_entity_decode(get_the_title($post), ENT_QUOTES);
+
+            $summary = get_the_excerpt($post);
+            if (!$summary) {
+                $summary = wp_trim_words(wp_strip_all_tags($post->post_content), 30, '...');
+            }
+            $summary = html_entity_decode($summary, ENT_QUOTES);
+
+            $hashtags = '#Crypto #News';
+
+            // Sanity cap only -- X Premium (@coin680's plan) supports long-form
+            // posts, so we don't need to squeeze into the classic 280-char
+            // limit. This just stops a malformed/oversized excerpt from
+            // producing an absurdly long post.
+            $max_summary_len = 600;
+            if ($this->str_len($summary) > $max_summary_len) {
+                $summary = $this->str_trim($summary, $max_summary_len - 1) . '...';
+            }
+
+            $text = $title;
+            if ($summary) {
+                $text .= "\n\n{$summary}";
+            }
+            $text .= "\n\n{$hashtags}";
         }
-        $summary = html_entity_decode($summary, ENT_QUOTES);
-
-        $hashtags = '#Crypto #News';
-
-        // Sanity cap only -- X Premium (@coin680's plan) supports long-form
-        // posts, so we don't need to squeeze into the classic 280-char
-        // limit. This just stops a malformed/oversized excerpt from
-        // producing an absurdly long post.
-        $max_summary_len = 600;
-        if ($this->str_len($summary) > $max_summary_len) {
-            $summary = $this->str_trim($summary, $max_summary_len - 1) . '...';
-        }
-
-        $text = $title;
-        if ($summary) {
-            $text .= "\n\n{$summary}";
-        }
-        $text .= "\n\n{$hashtags}";
 
         // Use the post's own featured image if one is set -- falls back to
         // no image (empty string) rather than guessing/fetching anything
@@ -132,4 +156,3 @@ class Coin680X_AutoPost {
         Coin680X_Queue::add($text, $media_url, '', current_time('mysql', true));
     }
 }
-
