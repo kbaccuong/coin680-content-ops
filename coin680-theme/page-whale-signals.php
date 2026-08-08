@@ -11,10 +11,10 @@
  * Initial load is server-rendered (SEO + no-JS fallback, same principle as
  * page-crypto-prices.php / page-gainers-losers.php). On top of that, page 1
  * (the "live" view) polls the /coin680/v1/whale-signals REST endpoint every
- * ~20s and replaces the table body -- a genuinely fresh feed without the
+ * ~60s and replaces the table body -- a genuinely fresh feed without the
  * WebSocket/persistent-connection infrastructure this shared hosting can't
  * run; the underlying data itself only actually changes as often as the
- * Bitquery poll cron runs (every 2 min), so 20s polling is about giving the
+ * Bitquery poll cron runs (every 2 min), so 60s polling is about giving the
  * PAGE a live feel, not implying faster-than-that real data turnover.
  * Pagination beyond page 1 is browsing history, not a live view, so
  * auto-refresh is intentionally off there.
@@ -22,6 +22,16 @@
  * Added 2026-07-30 after upgrading to a paid Bitquery plan; expanded same
  * day with pagination/filters/live-refresh/public watchlist directory per
  * direct follow-up request.
+ *
+ * Smart Money Moves window widened from 24h to 168h (7 days) on 2026-08-08
+ * after a user report that watched-wallet activity they knew had happened
+ * wasn't showing up here -- the matching/recording logic itself was fine,
+ * but this page's window was hardcoded to 24h while the wp-admin equivalent
+ * view uses 72h, so any activity older than a day silently dropped off the
+ * PUBLIC page even though it was correctly stored in the DB (14-day
+ * retention, see Coin680Watchlist_Fetcher::cleanup_old()). 168h stays well
+ * inside that retention window while giving a much more realistic view of
+ * "recent" activity for wallets that don't trade every single day.
  */
 get_header();
 
@@ -37,7 +47,7 @@ if (!in_array($coin680_ws_type, array('buy', 'sell', 'swap'), true)) {
 $coin680_ws_page = max(1, (int) ($_GET['paged'] ?? 1));
 
 $coin680_ws_result = coin680_ws_query_signals($coin680_ws_chain, $coin680_ws_type, $coin680_ws_page);
-$coin680_ws_smart_money_raw = class_exists('Coin680Watchlist_Fetcher') ? Coin680Watchlist_Fetcher::get_recent(24, 15) : array();
+$coin680_ws_smart_money_raw = class_exists('Coin680Watchlist_Fetcher') ? Coin680Watchlist_Fetcher::get_recent(168, 30) : array();
 $coin680_ws_smart_money = array_map('coin680_ws_format_watchlist_move', $coin680_ws_smart_money_raw);
 $coin680_ws_watched_wallets = class_exists('Coin680Watchlist') ? Coin680Watchlist::get_all(true) : array();
 
@@ -100,7 +110,7 @@ $coin680_ws_type_labels = array('' => __('All Types', 'coin680'), 'buy' => __('B
             </table>
         </div>
         <?php else : ?>
-        <p class="c680-ws-empty-note"><?php esc_html_e('No activity from watched wallets in the last 24 hours yet -- this updates automatically the moment one of them makes a move.', 'coin680'); ?></p>
+        <p class="c680-ws-empty-note"><?php esc_html_e('No activity from watched wallets in the last 7 days yet -- this updates automatically the moment one of them makes a move.', 'coin680'); ?></p>
         <?php endif; ?>
     </section>
     <?php endif; ?>
@@ -227,4 +237,3 @@ $coin680_ws_type_labels = array('' => __('All Types', 'coin680'), 'buy' => __('B
 <?php endif; ?>
 
 <?php get_footer(); ?>
-
