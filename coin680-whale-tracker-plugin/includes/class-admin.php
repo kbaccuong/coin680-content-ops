@@ -491,12 +491,25 @@ class Coin680Whale_Admin {
                         <th><?php esc_html_e('Alerted?', 'coin680-whale-tracker'); ?></th>
                     </tr></thead>
                     <tbody>
+                    <?php
+                    $c680_sm_side_labels = array(
+                        'buy'      => __('Bought', 'coin680-whale-tracker'),
+                        'sell'     => __('Sold', 'coin680-whale-tracker'),
+                        'received' => __('Received', 'coin680-whale-tracker'),
+                        'sent'     => __('Sent', 'coin680-whale-tracker'),
+                    );
+                    ?>
                     <?php foreach ($sm_items as $item) : ?>
                         <tr>
                             <td><?php echo esc_html($item->tx_timestamp); ?></td>
                             <td><?php echo esc_html($item->wallet_label ?: (substr($item->wallet_address, 0, 6) . '...')); ?></td>
                             <td><?php echo esc_html(ucfirst($item->chain)); ?></td>
-                            <td><?php echo $item->side === 'buy' ? esc_html__('Bought', 'coin680-whale-tracker') : esc_html__('Sold', 'coin680-whale-tracker'); ?> <?php echo esc_html(strtoupper($item->symbol)); ?><?php echo $item->counter_symbol ? ' <small>for ' . esc_html($item->counter_symbol) . '</small>' : ''; ?></td>
+                            <td>
+                                <?php echo esc_html($c680_sm_side_labels[$item->side] ?? ucfirst($item->side)); ?> <?php echo esc_html(strtoupper($item->symbol)); ?><?php echo $item->counter_symbol ? ' <small>for ' . esc_html($item->counter_symbol) . '</small>' : ''; ?>
+                                <?php if (in_array($item->side, array('received', 'sent'), true) && $item->dex_name) : ?>
+                                    <br><small><?php echo $item->side === 'received' ? esc_html__('from', 'coin680-whale-tracker') : esc_html__('to', 'coin680-whale-tracker'); ?> <?php echo esc_html($item->dex_name); ?></small>
+                                <?php endif; ?>
+                            </td>
                             <td>$<?php echo esc_html(number_format($item->amount_usd)); ?></td>
                             <td><?php echo $item->alerted ? '✓' : ''; ?></td>
                         </tr>
