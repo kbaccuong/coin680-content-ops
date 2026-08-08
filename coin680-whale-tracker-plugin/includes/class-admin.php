@@ -60,6 +60,48 @@ class Coin680Whale_Admin {
                 return current_user_can('manage_options');
             },
         ));
+        register_rest_route('coin680whale/v1', '/smart-money', array(
+            'methods'             => 'GET',
+            'callback'            => array($this, 'rest_smart_money'),
+            'permission_callback' => function () {
+                return current_user_can('manage_options');
+            },
+        ));
+    }
+
+    /**
+     * Admin-only diagnostic: exposes Coin680Watchlist_Fetcher::get_recent()
+     * over REST so watched-wallet activity can be verified remotely without
+     * a logged-in wp-admin session (Application Password auth only reaches
+     * REST, not the wp-admin HTML screens). Added 2026-08-08 after a user
+     * report that a watched wallet's past buy/sell activity wasn't showing
+     * on the public page -- turned out to be page-whale-signals.php's 24h
+     * window, not a recording bug, but this endpoint is the fast way to
+     * confirm that distinction (data present but old vs. never recorded)
+     * without waiting on a wider public-page window to prove it.
+     */
+    public function rest_smart_money($request) {
+        if (!class_exists('Coin680Watchlist_Fetcher')) {
+            return new WP_REST_Response(array('error' => 'Coin680Watchlist_Fetcher not loaded'), 500);
+        }
+        $hours = max(1, min(336, (int) ($request->get_param('hours') ?: 168)));
+        $limit = max(1, min(200, (int) ($request->get_param('limit') ?: 50)));
+        $items = Coin680Watchlist_Fetcher::get_recent($hours, $limit);
+        $out = array();
+        foreach ($items as $item) {
+            $out[] = array(
+                'time'           => $item->tx_timestamp,
+                'wallet_label'   => $item->wallet_label,
+                'wallet_address' => $item->wallet_address,
+                'chain'          => $item->chain,
+                'side'           => $item->side,
+                'symbol'         => $item->symbol,
+                'counter_symbol' => $item->counter_symbol,
+                'amount_usd'     => (float) $item->amount_usd,
+                'alerted'        => (bool) $item->alerted,
+            );
+        }
+        return new WP_REST_Response(array('hours' => $hours, 'count' => count($out), 'items' => $out), 200);
     }
 
     public function rest_purge_bad_trades($request) {
