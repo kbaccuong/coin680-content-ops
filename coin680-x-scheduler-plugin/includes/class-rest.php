@@ -2,11 +2,14 @@
 /**
  * Small admin-only REST API surface for the X Scheduler queue -- lets an
  * authenticated admin (WP Application Password) inspect the queue, trigger
- * an immediate post, or delete an already-published live tweet, all over
- * REST, without needing direct database/SSH access (both are unavailable
- * on this host). Added 2026-07-31 to fix/replace 3 tweets that went out
- * truncated mid-sentence before a summary-length bug was caught (see
- * Coin680X_AutoPost's docblock for that bug).
+ * an immediate post, delete an already-published live tweet, or cancel a
+ * still-pending queue row that hasn't posted yet, all over REST, without
+ * needing direct database/SSH access (both are unavailable on this host).
+ * Added 2026-07-31 to fix/replace 3 tweets that went out truncated
+ * mid-sentence before a summary-length bug was caught (see
+ * Coin680X_AutoPost's docblock for that bug). cancel-queue-item added
+ * 2026-08-08 after editing an already-published post's meta re-triggered
+ * duplicate/stale queue rows with no live tweet_id yet to delete by.
  *
  * Registered unconditionally (not inside Coin680X_Admin, which only loads
  * when is_admin() is true) because REST requests to wp-json don't run in
@@ -49,6 +52,11 @@ class Coin680X_Rest {
         register_rest_route('coin680x/v1', '/delete-tweet', array(
             'methods'             => 'POST',
             'callback'            => array($this, 'delete_tweet'),
+            'permission_callback' => array($this, 'permission'),
+        ));
+        register_rest_route('coin680x/v1', '/cancel-queue-item', array(
+            'methods'             => 'POST',
+            'callback'            => array($this, 'cancel_queue_item'),
             'permission_callback' => array($this, 'permission'),
         ));
     }
@@ -96,5 +104,33 @@ class Coin680X_Rest {
             return new WP_Error('delete_failed', $result->get_error_message(), array('status' => 500));
         }
         return rest_ensure_response(array('deleted' => true, 'tweet_id' => $tweet_id));
+    }
+
+    /**
+     * Cancels a queue row by its internal id, before it has ever posted --
+     * distinct from delete_tweet() above, which deletes an already-LIVE
+     * tweet via X's API using the real tweet_id. This just removes the row
+     * from our own queue table so process_due_items() never picks it up.
+     * Refuses to touch a row that's already status='posted' (use
+     * delete-tweet with the real tweet_id for that instead), to avoid
+     * silently hiding a live tweet from the queue view without actually
+     * deleting it from X.
+     */
+    public function cancel_queue_item($request) {
+        $id = (int) $request->get_param('id');
+        if (!$id) {
+            return new WP_Error('missing_id', 'id is required', array('status' => 400));
+        }
+        global $wpdb;
+        $table = Coin680X_Queue::table_name();
+        $item = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE id = %d", $id));
+        if (!$item) {
+            return new WP_Error('not_found', 'No queue item with that id', array('status' => 404));
+        }
+        if ($item->status === 'posted') {
+            return new WP_Error('already_posted', 'This item already posted live -- use delete-tweet with its tweet_id instead', array('status' => 409));
+        }
+        Coin680X_Queue::delete($id);
+        return rest_ensure_response(array('cancelled' => true, 'id' => $id));
     }
 }
