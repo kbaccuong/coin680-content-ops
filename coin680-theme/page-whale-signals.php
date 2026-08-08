@@ -94,14 +94,19 @@ $coin680_ws_type_labels = array('' => __('All Types', 'coin680'), 'buy' => __('B
                     <th><?php esc_html_e('Amount', 'coin680'); ?></th>
                 </tr></thead>
                 <tbody>
-                <?php foreach ($coin680_ws_smart_money as $item) : ?>
+                <?php foreach ($coin680_ws_smart_money as $item) :
+                    $c680_ws_is_inflow = in_array($item['side'], array('buy', 'received'), true);
+                ?>
                     <tr>
                         <td><?php echo esc_html($item['time_ago']); ?></td>
                         <td class="c680-prices-name"><strong><?php echo esc_html($item['wallet_label']); ?></strong></td>
                         <td><?php echo esc_html($item['chain_label']); ?></td>
-                        <td class="<?php echo $item['side'] === 'buy' ? 'c680-ticker-up' : 'c680-ticker-down'; ?>">
-                            <?php echo $item['side'] === 'buy' ? '&#9650; ' . esc_html__('Bought', 'coin680') : '&#9660; ' . esc_html__('Sold', 'coin680'); ?>
+                        <td class="<?php echo $c680_ws_is_inflow ? 'c680-ticker-up' : 'c680-ticker-down'; ?>">
+                            <?php echo $c680_ws_is_inflow ? '&#9650; ' : '&#9660; '; ?><?php echo esc_html($item['side_label']); ?>
                             <?php echo esc_html($item['symbol']); ?>
+                            <?php if (!empty($item['counterparty_label'])) : ?>
+                                <br><small><?php echo $item['side'] === 'received' ? esc_html__('from', 'coin680') : esc_html__('to', 'coin680'); ?> <?php echo esc_html($item['counterparty_label']); ?></small>
+                            <?php endif; ?>
                         </td>
                         <td><?php echo esc_html($item['amount_fmt']); ?></td>
                     </tr>
