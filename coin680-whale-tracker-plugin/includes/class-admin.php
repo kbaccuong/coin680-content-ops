@@ -67,6 +67,13 @@ class Coin680Whale_Admin {
                 return current_user_can('manage_options');
             },
         ));
+        register_rest_route('coin680whale/v1', '/watchlist-backfill', array(
+            'methods'             => 'POST',
+            'callback'            => array($this, 'rest_watchlist_backfill'),
+            'permission_callback' => function () {
+                return current_user_can('manage_options');
+            },
+        ));
     }
 
     /**
@@ -132,6 +139,24 @@ class Coin680Whale_Admin {
             'watched_wallets'=> $wallets_out,
             'last_poll_at'   => $last_poll,
         ), 200);
+    }
+
+    /**
+     * Triggers Coin680Watchlist_Fetcher::backfill() synchronously over
+     * REST -- a one-time historical pull (both DEX swaps and plain
+     * transfers) for watched wallets going back $hours, instead of only
+     * ever recording activity from the moment the transfer-tracking
+     * feature was deployed onward. Added 2026-08-08 same day as
+     * poll_transfers() itself, per direct request after confirming real
+     * past activity existed that the old DEX-only logic never recorded.
+     */
+    public function rest_watchlist_backfill($request) {
+        if (!class_exists('Coin680Watchlist_Fetcher')) {
+            return new WP_REST_Response(array('error' => 'Coin680Watchlist_Fetcher not loaded'), 500);
+        }
+        $hours = max(1, min(336, (int) ($request->get_param('hours') ?: 336)));
+        $count = Coin680Watchlist_Fetcher::instance()->backfill($hours);
+        return new WP_REST_Response(array('hours' => $hours, 'rows_in_window' => $count), 200);
     }
 
     public function rest_purge_bad_trades($request) {
