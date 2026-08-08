@@ -17,6 +17,23 @@
  * against the real API.
  *
  * Added 2026-07-30 after upgrading to a paid Bitquery plan.
+ *
+ * Extended 2026-08-08: poll_chain()/process_trade() below ONLY ever
+ * matched DEX swaps (Bitquery's DEXTrades type -- a trade with a Buy leg
+ * and a Sell leg through a DEX contract). A user report plus direct
+ * cross-check against Etherscan/Ethplorer confirmed two watched wallets
+ * had large, real transfers (thousands of ETH) that never appeared here
+ * at all -- because those were plain transfers (exchange deposits/
+ * withdrawals, wallet-to-wallet moves), not DEX swaps, and the old code
+ * had no path to see anything outside DEXTrades. Added poll_transfers()/
+ * process_transfer() to also query Bitquery's plain Transfers type for
+ * EVM chains (Solana transfer schema not covered yet -- no Solana wallets
+ * watched as of this writing, add support if that changes) so ANY
+ * transfer in or out of a watched wallet gets recorded, not just swaps.
+ * Doubles the Bitquery query count per poll cycle (one DEXTrades query +
+ * one Transfers query per chain instead of just one) -- worth watching
+ * against the point budget if the watchlist grows much beyond a handful
+ * of wallets (see [[coin680-bitquery-point-budget-2026-07]]).
  */
 
 if (!defined('ABSPATH')) {
@@ -30,6 +47,32 @@ class Coin680Watchlist_Fetcher {
     const MIN_USD = 500;
     const ALERT_COOLDOWN_MINUTES = 10;
     const SUPPORTED_KINDS = array('solana', 'evm');
+
+    /**
+     * Best-effort, publicly-known exchange hot wallet addresses (lowercase)
+     * -- used only to label the counterparty of a plain transfer as e.g.
+     * "Binance" instead of a raw truncated address when it happens to
+     * match. This list is NOT exhaustive (exchanges rotate/add hot wallets
+     * constantly) and a miss just falls back to showing the counterparty's
+     * own address, which is still useful -- this is a labeling nicety, not
+     * something the matching logic depends on for correctness.
+     */
+    const KNOWN_EXCHANGE_WALLETS = array(
+        // Ethereum mainnet
+        '0x28c6c06298d514db089934071355e5743bf21d60' => 'Binance',
+        '0x21a31ee1afc51d94c2efccaa2092ad1028285549' => 'Binance',
+        '0xdfd5293d8e347dfe59e90efd55b2956a1343963d' => 'Binance',
+        '0x71660c4005ba85c37ccec55d0c4493e66fe775d3' => 'Coinbase',
+        '0x503828976d22510aad0201ac7ec88293211d923' => 'Coinbase',
+        '0x3cd751e6b0078be393132286c442345e5dc49699' => 'Coinbase',
+        '0x2910543af39aba0cd09dbb2d50200b3e800a63d2' => 'Kraken',
+        '0x6cc5f688a315f3dc28a7781717a9a798a59fda7b' => 'OKX',
+        '0xf89d7b9c864f589bbf53a82105107622b35eaa40' => 'Bybit',
+        '0x6262998ced04146fa42253a5c0af90ca02dfd2a3' => 'Crypto.com',
+        // BSC
+        '0x8894e0a0c962cb723c1976a4421c95949be2d4e' => 'Binance',
+        '0xf977814e90da44bfa03b6295a0616a897441acec' => 'Binance',
+    );
 
     public static function instance() {
         if (self::$instance === null) {
@@ -144,7 +187,9 @@ class Coin680Watchlist_Fetcher {
         }
 
         foreach ($by_chain as $chain => $chain_wallets) {
-            $this->poll_chain($chain, Coin680Bitquery_Labels::chain_config($chain), $chain_wallets);
+            $config = Coin680Bitquery_Labels::chain_config($chain);
+            $this->poll_chain($chain, $config, $chain_wallets);
+            $this->poll_transfers($chain, $config, $chain_wallets);
         }
     }
 
@@ -274,6 +319,120 @@ class Coin680Watchlist_Fetcher {
             // so re-polling the same time window never double-alerts.
             if ($wpdb->rows_affected > 0) {
                 $this->maybe_alert($wallet, $wpdb->insert_id, $chain, $side, $symbol, $counter_symbol, $amount_usd, $dex_name, $tx_hash);
+            }
+        }
+    }
+
+    /**
+     * Plain-transfer counterpart to poll_chain()/process_trade() above --
+     * catches exchange deposits/withdrawals and wallet-to-wallet moves that
+     * never go through a DEX contract, so never show up as a DEXTrades Buy/
+     * Sell leg. EVM only for now (Solana's Transfers schema differs enough
+     * that it wasn't worth guessing at without a Solana wallet actually on
+     * the watchlist to test against).
+     */
+    private function poll_transfers($chain, $config, $wallets) {
+        if (!$config || $config['query_kind'] !== 'evm') {
+            return;
+        }
+
+        $last_opt = "coin680watchlist_last_transfer_time_{$chain}";
+        $since = get_option($last_opt) ?: gmdate('Y-m-d\TH:i:s\Z', time() - 15 * MINUTE_IN_SECONDS);
+        $now = gmdate('Y-m-d\TH:i:s\Z', time());
+
+        $addresses = wp_list_pluck($wallets, 'address');
+        $address_list = wp_json_encode(array_values($addresses));
+        $network = $config['network'];
+
+        $query = "{ EVM(network: {$network}) { Transfers(limit: {count: 50} orderBy: {descending: Block_Time} where: {Block: {Time: {since: \"{$since}\" till: \"{$now}\"}} any: [{Transfer: {Sender: {in: {$address_list}}}} {Transfer: {Receiver: {in: {$address_list}}}}]}) { Transaction { Hash } Transfer { Sender Receiver Amount AmountInUSD Currency { Symbol } } Block { Time } } } }";
+
+        $data = $this->gql($query);
+        $rows = $data['EVM']['Transfers'] ?? null;
+
+        if (is_array($rows)) {
+            $wallet_by_address = array();
+            foreach ($wallets as $w) {
+                $wallet_by_address[strtolower($w->address)] = $w;
+            }
+            foreach ($rows as $row) {
+                $this->process_transfer($chain, $row, $wallet_by_address);
+            }
+        }
+
+        update_option($last_opt, $now, false);
+    }
+
+    private function process_transfer($chain, $row, $wallet_by_address) {
+        $t = $row['Transfer'] ?? null;
+        if (!$t) {
+            return;
+        }
+        $sender = strtolower($t['Sender'] ?? '');
+        $receiver = strtolower($t['Receiver'] ?? '');
+        if (!$sender || !$receiver || $sender === $receiver) {
+            return; // self-transfer or malformed row, nothing meaningful to record
+        }
+        $tx_hash = $row['Transaction']['Hash'] ?? '';
+        if (!$tx_hash) {
+            return;
+        }
+        $symbol = $t['Currency']['Symbol'] ?? '';
+        $amount = (float) ($t['Amount'] ?? 0);
+        $amount_usd = (float) ($t['AmountInUSD'] ?? 0);
+        if (!$symbol || $amount_usd < self::MIN_USD) {
+            return;
+        }
+        $timestamp = $row['Block']['Time'] ?? null;
+
+        $matches = array();
+        if (isset($wallet_by_address[$sender])) {
+            $matches[] = array('wallet' => $wallet_by_address[$sender], 'side' => 'sent', 'counterparty' => $receiver);
+        }
+        if (isset($wallet_by_address[$receiver])) {
+            $matches[] = array('wallet' => $wallet_by_address[$receiver], 'side' => 'received', 'counterparty' => $sender);
+        }
+        if (empty($matches)) {
+            return;
+        }
+
+        global $wpdb;
+        $table = self::table_name();
+
+        foreach ($matches as $match) {
+            $wallet = $match['wallet'];
+            $counterparty_label = self::KNOWN_EXCHANGE_WALLETS[$match['counterparty']]
+                ?? (substr($match['counterparty'], 0, 6) . '...' . substr($match['counterparty'], -4));
+
+            // trade_index doesn't exist for plain transfers (no Trade.Index
+            // field on this Bitquery type) -- the UNIQUE KEY still needs
+            // something to distinguish multiple transfer legs that might
+            // share the same tx_hash+wallet (e.g. two different tokens
+            // moved to the same wallet in one transaction). A deterministic
+            // hash of sender+receiver+symbol+amount, offset well above the
+            // trade_index range DEX rows use, keeps this collision-safe in
+            // all but very unusual repeat-exact-amount cases.
+            $synthetic_index = 1000000 + (crc32($sender . $receiver . $symbol . $amount) % 900000);
+
+            $wpdb->query($wpdb->prepare(
+                "INSERT IGNORE INTO $table
+                (wallet_id, chain, tx_hash, trade_index, side, symbol, counter_symbol, dex_name, amount, amount_usd, tx_timestamp, created_at)
+                VALUES (%d,%s,%s,%d,%s,%s,%s,%s,%f,%f,%s,%s)",
+                (int) $wallet->id,
+                $chain,
+                $tx_hash,
+                $synthetic_index,
+                $match['side'],
+                strtoupper($symbol),
+                '',
+                $counterparty_label,
+                $amount,
+                $amount_usd,
+                $timestamp ? gmdate('Y-m-d H:i:s', strtotime($timestamp)) : current_time('mysql', true),
+                current_time('mysql', true)
+            ));
+
+            if ($wpdb->rows_affected > 0) {
+                $this->maybe_alert($wallet, $wpdb->insert_id, $chain, $match['side'], strtoupper($symbol), '', $amount_usd, $counterparty_label, $tx_hash);
             }
         }
     }
