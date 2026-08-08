@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * Coin680 theme functions.
  */
@@ -878,13 +878,30 @@ function coin680_ws_format_signal($row) {
 
 function coin680_ws_format_watchlist_move($row) {
     $chain_cfg = class_exists('Coin680Bitquery_Labels') ? Coin680Bitquery_Labels::chain_config($row->chain) : null;
+    // 'buy'/'sell' = DEX swap legs (original feature); 'received'/'sent' =
+    // plain transfers (exchange deposits/withdrawals, wallet-to-wallet
+    // moves) added 2026-08-08 so watched-wallet activity outside DEX swaps
+    // stops being invisible -- see Coin680Watchlist_Fetcher::process_transfer().
+    $side_labels = array(
+        'buy'      => __('Bought', 'coin680'),
+        'sell'     => __('Sold', 'coin680'),
+        'received' => __('Received', 'coin680'),
+        'sent'     => __('Sent', 'coin680'),
+    );
     return array(
-        'time_ago'     => coin680_ws_time_ago($row->tx_timestamp),
-        'wallet_label' => $row->wallet_label ?: (substr($row->wallet_address, 0, 6) . '...' . substr($row->wallet_address, -4)),
-        'chain_label'  => $chain_cfg['label'] ?? ucfirst($row->chain),
-        'side'         => $row->side,
-        'symbol'       => strtoupper($row->symbol),
-        'amount_fmt'   => '$' . number_format($row->amount_usd),
+        'time_ago'           => coin680_ws_time_ago($row->tx_timestamp),
+        'wallet_label'       => $row->wallet_label ?: (substr($row->wallet_address, 0, 6) . '...' . substr($row->wallet_address, -4)),
+        'chain_label'        => $chain_cfg['label'] ?? ucfirst($row->chain),
+        'side'               => $row->side,
+        'side_label'         => $side_labels[$row->side] ?? ucfirst($row->side),
+        'symbol'             => strtoupper($row->symbol),
+        'amount_fmt'         => '$' . number_format($row->amount_usd),
+        // For transfer rows, dex_name is repurposed to hold the
+        // counterparty's label (a known exchange name if it matched
+        // Coin680Watchlist_Fetcher::KNOWN_EXCHANGE_WALLETS, otherwise its
+        // own truncated address) -- empty for DEX swap rows, which use
+        // dex_name for its original purpose (the DEX protocol name) instead.
+        'counterparty_label' => in_array($row->side, array('received', 'sent'), true) ? $row->dex_name : '',
     );
 }
 
@@ -1196,6 +1213,7 @@ function coin680_handle_create_forum_topic($request) {
         'url'      => get_permalink($topic_id),
     ), 200);
 }
+
 
 
 
