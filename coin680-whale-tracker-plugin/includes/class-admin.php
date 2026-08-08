@@ -101,7 +101,37 @@ class Coin680Whale_Admin {
                 'alerted'        => (bool) $item->alerted,
             );
         }
-        return new WP_REST_Response(array('hours' => $hours, 'count' => count($out), 'items' => $out), 200);
+
+        // Also return the full watched-wallet list (with untruncated
+        // addresses) so it's possible to cross-check a specific wallet
+        // against an independent source (Bitquery/Etherscan/BscScan
+        // directly) when activity count comes back 0 -- lets you tell
+        // "wallet genuinely quiet" apart from "polling isn't running" or
+        // "wallet address was entered wrong" without a wp-admin session.
+        $wallets_out = array();
+        if (class_exists('Coin680Watchlist')) {
+            foreach (Coin680Watchlist::get_all(true) as $w) {
+                $wallets_out[] = array(
+                    'id'      => (int) $w->id,
+                    'chain'   => $w->chain,
+                    'address' => $w->address,
+                    'label'   => $w->label,
+                );
+            }
+        }
+
+        // Last time the watchlist poll cron actually ran, if the fetcher
+        // tracks it -- helps distinguish "cron never fires" from "cron
+        // fires fine, these specific wallets just haven't traded".
+        $last_poll = get_option('coin680watchlist_last_poll_at', '');
+
+        return new WP_REST_Response(array(
+            'hours'          => $hours,
+            'count'          => count($out),
+            'items'          => $out,
+            'watched_wallets'=> $wallets_out,
+            'last_poll_at'   => $last_poll,
+        ), 200);
     }
 
     public function rest_purge_bad_trades($request) {
